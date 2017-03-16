@@ -1,15 +1,38 @@
 package com.islavstan.wifisetting;
 
+import android.Manifest;
+import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
+import android.content.pm.PackageManager;
+import android.location.Location;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.net.wifi.WifiConfiguration;
 import android.net.wifi.WifiManager;
+import android.os.Build;
+import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
+import android.support.v4.app.ActivityCompat;
+import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.telephony.TelephonyManager;
 import android.util.Log;
+import android.view.View;
+import android.widget.Button;
+import android.widget.TextView;
 import android.widget.Toast;
+
+import com.github.clans.fab.FloatingActionButton;
+import com.google.android.gms.common.ConnectionResult;
+import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.location.LocationListener;
+import com.google.android.gms.location.LocationServices;
+import com.google.android.gms.maps.GoogleMap;
+import com.google.android.gms.maps.MapView;
+import com.google.android.gms.maps.OnMapReadyCallback;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
@@ -17,15 +40,101 @@ import java.lang.reflect.Method;
 
 import cc.mvdan.accesspoint.WifiApControl;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity implements OnMapReadyCallback,
+        GoogleApiClient.ConnectionCallbacks,
+        GoogleApiClient.OnConnectionFailedListener,
+        LocationListener {
+    MapView mapView;
+    GoogleMap mMap;
+    GoogleApiClient mGoogleApiClient;
+    FloatingActionButton fab;
+    Button stopService;
+    Intent intent;
+    private MyBroadcastReceiver mMyBroadcastReceiver;
+    TextView timer;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+        fab = (FloatingActionButton)findViewById(R.id.fab);
+        timer = (TextView)findViewById(R.id.timer);
+
+        stopService = (Button)findViewById(R.id.stop);
+
+        stopService.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (intent != null) {
+                    stopService(intent);
+                    intent = null;
+                }
+            }
+        });
+
+
+        fab.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                 intent = new Intent(MainActivity.this, TimerIntentService.class);
+                startService(intent);
+            }
+        });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        mapView = (MapView) findViewById(R.id.map_view);
+        mapView.onCreate(savedInstanceState);
+       mapView.getMapAsync(new OnMapReadyCallback() {
+           @Override
+           public void onMapReady(GoogleMap googleMap) {
+               mMap = googleMap;
+               mMap.setMapType(GoogleMap.MAP_TYPE_NORMAL);
+               mapView.onResume();
+               if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                   if (ContextCompat.checkSelfPermission(MainActivity.this,
+                           Manifest.permission.ACCESS_FINE_LOCATION)
+                           == PackageManager.PERMISSION_GRANTED) {
+                       buildGoogleApiClient();
+                       mMap.setMyLocationEnabled(true);
+                   }
+               }
+               else {
+                   buildGoogleApiClient();
+                   mMap.setMyLocationEnabled(true);
+               }
+           }
+       });
+
+
 //http://stackoverflow.com/questions/17152847/create-wifi-hotspot-configuration-in-android
 //http://stackoverflow.com/questions/32817552/how-to-enable-mobile-data-on-off-programmatically
-        WifiManager wifiManager = (WifiManager) getSystemService(Context.WIFI_SERVICE);
+      /*  WifiManager wifiManager = (WifiManager) getSystemService(Context.WIFI_SERVICE);
 
 
         if (wifiManager.isWifiEnabled()) {
@@ -71,9 +180,78 @@ public class MainActivity extends AppCompatActivity {
                 .getSystemService(Context.CONNECTIVITY_SERVICE);
         NetworkInfo netInfo = connManager.getNetworkInfo(ConnectivityManager.TYPE_MOBILE);
         return ((netInfo != null) && netInfo.isConnected());
+    }*/
+
+    }
+
+    protected synchronized void buildGoogleApiClient() {
+        mGoogleApiClient = new GoogleApiClient.Builder(this)
+                .addConnectionCallbacks(this)
+                .addOnConnectionFailedListener(this)
+                .addApi(LocationServices.API)
+                .build();
+        mGoogleApiClient.connect();
+    }
+
+    @Override
+    public void onConnected(@Nullable Bundle bundle) {
+
+    }
+
+    @Override
+    public void onConnectionSuspended(int i) {
+
+    }
+
+    @Override
+    public void onConnectionFailed(@NonNull ConnectionResult connectionResult) {
+
+    }
+
+    @Override
+    public void onLocationChanged(Location location) {
+
+    }
+
+    @Override
+    public void onMapReady(GoogleMap googleMap) {
+
     }
 
 
+    public class MyBroadcastReceiver extends BroadcastReceiver {
+
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            int minutes = intent.getIntExtra("minutes",0);
+            int seconds = intent.getIntExtra("seconds",0);
+            Log.d("stas", seconds +"sec in broadcast");
+            timer.setText(String.format("%02d:%02d", minutes, seconds));
+        }
+    }
+
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        mMyBroadcastReceiver = new MyBroadcastReceiver();
+        // регистрируем BroadcastReceiver
+        IntentFilter intentFilter = new IntentFilter(TimerIntentService.ACTION);
+        intentFilter.addCategory(Intent.CATEGORY_DEFAULT);
+        registerReceiver(mMyBroadcastReceiver, intentFilter);
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        unregisterReceiver(mMyBroadcastReceiver);
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        unregisterReceiver(mMyBroadcastReceiver);
+    }
 }
 
 
