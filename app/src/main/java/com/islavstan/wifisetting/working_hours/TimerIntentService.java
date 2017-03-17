@@ -1,4 +1,4 @@
-package com.islavstan.wifisetting;
+package com.islavstan.wifisetting.working_hours;
 
 import android.app.IntentService;
 import android.app.Notification;
@@ -20,7 +20,7 @@ public class TimerIntentService extends IntentService {
     int minutes;
     private volatile long elapsedTime;
    // private final MyBinder myBinder = new MyBinder();
-    public static final String ACTION = "com.islavstan.wifisetting.TimerIntentService";
+    public static final String ACTION = "com.islavstan.wifisetting.working_hours.TimerIntentService";
 
     public TimerIntentService() {
         super("name");

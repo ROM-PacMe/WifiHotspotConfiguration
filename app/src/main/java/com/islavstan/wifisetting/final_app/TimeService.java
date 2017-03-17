@@ -11,8 +11,13 @@ import android.support.v4.app.NotificationCompat;
 import android.util.Log;
 
 import com.islavstan.wifisetting.R;
-import com.islavstan.wifisetting.TimerActivity;
 
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+import java.util.Date;
+
+import rx.android.schedulers.AndroidSchedulers;
+import rx.schedulers.Schedulers;
 
 
 public class TimeService extends Service {
@@ -26,7 +31,7 @@ public class TimeService extends Service {
     long timeSwapBuff = 0L;
     long updatedTime = 0L;
 
-
+    DBMethods dbMethods;
     // Is the service tracking time?
     private boolean isTimerRunning;
 
@@ -35,6 +40,12 @@ public class TimeService extends Service {
 
     // Service binder
     private final IBinder serviceBinder = new TimeService.RunServiceBinder();
+
+
+    Calendar c = Calendar.getInstance();
+    SimpleDateFormat df = new SimpleDateFormat("dd-MMM-yyyy");
+    String date = df.format(c.getTime());
+
 
     public class RunServiceBinder extends Binder {
         TimeService getService() {
@@ -48,6 +59,28 @@ public class TimeService extends Service {
         if (Log.isLoggable(TAG, Log.VERBOSE)) {
             Log.v(TAG, "Creating service");
         }
+
+         dbMethods = new DBMethods(getApplicationContext());
+        Log.d("stas","date = "+ date);
+        dbMethods.checkDate(date)
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(result -> {
+                    if (result == 1) {
+                       Log.d("stas","result = "+ result);
+                        dbMethods.getTime(date)
+                                .map(Long::parseLong)
+                                .subscribeOn(Schedulers.io())
+                                .observeOn(AndroidSchedulers.mainThread())
+                                .subscribe(time -> {
+                                    if (time != null)
+                                        timeSwapBuff = time;
+                                });
+                    }else   Log.d("stas","result = "+ result);
+                        }
+                );
+
+
         startTime = 0;
         endTime = 0;
         isTimerRunning = false;
@@ -91,50 +124,35 @@ public class TimeService extends Service {
         }
     }
 
-    /**
-     * Stops the timer
-     */
+
     public void stopTimer() {
         if (isTimerRunning) {
-            // endTime = System.currentTimeMillis();
+
             timeSwapBuff += timeInMilliseconds;
+
+            dbMethods.writeTimeToDB(date, String.valueOf(timeSwapBuff))
+                    .subscribeOn(Schedulers.io())
+                    .observeOn(AndroidSchedulers.mainThread())
+                    .subscribe();
+
             isTimerRunning = false;
         } else {
             Log.e(TAG, "stopTimer request for a timer that isn't running");
         }
     }
 
-    /**
-     * @return whether the timer is running
-     */
+
     public boolean isTimerRunning() {
         return isTimerRunning;
     }
 
-    /**
-     * Returns the  elapsed time
-     *
-     * @return the elapsed time in seconds
-     */
-    public long elapsedTime() {
-        // If the timer is running, the end time will be zero
-        return endTime > startTime ?
-                (endTime - startTime) / 1000 :
-                (System.currentTimeMillis() - startTime) / 1000;
-    }
+
+
 
 
     public String getTime() {
-
         timeInMilliseconds = SystemClock.uptimeMillis() - startTime;
         updatedTime = timeSwapBuff + timeInMilliseconds;
-
-
-
-
-      /*  long time = endTime > startTime ?
-                (endTime - startTime) / 1000 :
-                (System.currentTimeMillis() - startTime) / 1000;*/
         int seconds = (int) (updatedTime / 1000);
         int hours = seconds / 3600;
         int minutes = seconds / 60;

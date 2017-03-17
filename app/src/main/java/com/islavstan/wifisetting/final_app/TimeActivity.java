@@ -22,7 +22,6 @@ import android.widget.TextView;
 
 import com.github.clans.fab.FloatingActionButton;
 import com.islavstan.wifisetting.R;
-import com.islavstan.wifisetting.TimerActivity;
 
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Method;

@@ -32,13 +32,13 @@
             </intent-filter>
         </activity>
 
-        <service android:name=".TimerIntentService" />
+        <service android:name=".working_hours.TimerIntentService" />
         <service
-            android:name=".MyService"
+            android:name=".working_hours.MyService"
             android:enabled="true"
             android:exported="false" />
         <service
-            android:name=".TimerActivity$TimerService"
+            android:name=".working_hours.TimerActivity$TimerService"
             android:exported="false" />
 
 

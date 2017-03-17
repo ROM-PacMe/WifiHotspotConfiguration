@@ -1,4 +1,4 @@
-package com.islavstan.wifisetting;
+package com.islavstan.wifisetting.working_hours;
 
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
@@ -10,16 +10,16 @@ import android.content.ComponentName;
 import android.content.Intent;
 import android.content.ServiceConnection;
 import android.os.Binder;
-import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
 import android.support.v4.app.NotificationCompat;
-import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
+
+import com.islavstan.wifisetting.R;
 
 import java.lang.ref.WeakReference;
 

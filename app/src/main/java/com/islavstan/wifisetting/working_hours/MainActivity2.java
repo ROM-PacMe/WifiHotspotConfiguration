@@ -1,4 +1,4 @@
-package com.islavstan.wifisetting;
+package com.islavstan.wifisetting.working_hours;
 
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
@@ -6,6 +6,7 @@ import android.widget.Button;
 import android.widget.TextView;
 
 import com.github.clans.fab.FloatingActionButton;
+import com.islavstan.wifisetting.R;
 
 public class MainActivity2 extends AppCompatActivity {
     TextView timer;
