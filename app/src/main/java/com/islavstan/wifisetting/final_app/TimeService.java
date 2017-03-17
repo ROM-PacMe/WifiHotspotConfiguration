@@ -6,6 +6,7 @@ import android.app.Service;
 import android.content.Intent;
 import android.os.Binder;
 import android.os.IBinder;
+import android.os.SystemClock;
 import android.support.v4.app.NotificationCompat;
 import android.util.Log;
 
@@ -19,7 +20,12 @@ public class TimeService extends Service {
     private static final String TAG = "stas";
 
     // Start and end times in milliseconds
-    private long startTime, endTime;
+    private long endTime;
+    long timeInMilliseconds = 0L;
+    private long startTime = 0L;
+    long timeSwapBuff = 0L;
+    long updatedTime = 0L;
+
 
     // Is the service tracking time?
     private boolean isTimerRunning;
@@ -76,10 +82,11 @@ public class TimeService extends Service {
      */
     public void startTimer() {
         if (!isTimerRunning) {
-            startTime = System.currentTimeMillis();
+            // startTime = System.currentTimeMillis();
+            startTime = SystemClock.uptimeMillis();
+
             isTimerRunning = true;
-        }
-        else {
+        } else {
             Log.e(TAG, "startTimer request for an already running timer");
         }
     }
@@ -89,10 +96,10 @@ public class TimeService extends Service {
      */
     public void stopTimer() {
         if (isTimerRunning) {
-            endTime = System.currentTimeMillis();
+            // endTime = System.currentTimeMillis();
+            timeSwapBuff += timeInMilliseconds;
             isTimerRunning = false;
-        }
-        else {
+        } else {
             Log.e(TAG, "stopTimer request for a timer that isn't running");
         }
     }
@@ -115,6 +122,26 @@ public class TimeService extends Service {
                 (endTime - startTime) / 1000 :
                 (System.currentTimeMillis() - startTime) / 1000;
     }
+
+
+    public String getTime() {
+
+        timeInMilliseconds = SystemClock.uptimeMillis() - startTime;
+        updatedTime = timeSwapBuff + timeInMilliseconds;
+
+
+
+
+      /*  long time = endTime > startTime ?
+                (endTime - startTime) / 1000 :
+                (System.currentTimeMillis() - startTime) / 1000;*/
+        int seconds = (int) (updatedTime / 1000);
+        int hours = seconds / 3600;
+        int minutes = seconds / 60;
+        seconds = seconds % 60;
+        return String.format("%02d:%02d:%02d", hours, minutes, seconds);
+    }
+
 
     /**
      * Place the service into the foreground

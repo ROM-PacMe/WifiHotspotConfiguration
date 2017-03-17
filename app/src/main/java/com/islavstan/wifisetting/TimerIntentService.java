@@ -46,6 +46,7 @@ public class TimerIntentService extends IntentService {
         while (elapsedTime == -1) {
             millis = System.currentTimeMillis() - startTime;
             seconds = (int) (millis / 1000);
+            int hours = seconds/3600;
             minutes = seconds / 60;
             seconds = seconds % 60;
             Log.d("stas", String.format("%02d:%02d", minutes, seconds));
