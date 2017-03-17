@@ -2,9 +2,11 @@ package com.islavstan.wifisetting;
 
 import android.Manifest;
 import android.content.BroadcastReceiver;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
 import android.location.Location;
 import android.net.ConnectivityManager;
@@ -12,10 +14,12 @@ import android.net.NetworkInfo;
 import android.net.wifi.WifiConfiguration;
 import android.net.wifi.WifiManager;
 import android.os.Build;
+import android.os.IBinder;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
+import android.support.v4.content.LocalBroadcastManager;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.telephony.TelephonyManager;
@@ -52,16 +56,42 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     Intent intent;
     private MyBroadcastReceiver mMyBroadcastReceiver;
     TextView timer;
+    private TimerIntentService timerIntentService;
+    private boolean bound = false;
+
+
+   /* private ServiceConnection connection = new ServiceConnection() {
+        @Override
+        public void onServiceConnected(ComponentName name, IBinder binder) {
+            TimerIntentService.MyBinder timeBinder = (TimerIntentService.MyBinder) binder;
+            timerIntentService = timeBinder.getService();
+            bound = true;
+            Log.d("stas2","bound = "+bound );
+        }
+
+        @Override
+        public void onServiceDisconnected(ComponentName name) {
+            bound = false;
+        }
+    };
+
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        Intent intent = new Intent(this, TimerIntentService.class);
+        bindService(intent, connection, Context.BIND_AUTO_CREATE);
+    }*/
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        fab = (FloatingActionButton)findViewById(R.id.fab);
-        timer = (TextView)findViewById(R.id.timer);
+        fab = (FloatingActionButton) findViewById(R.id.fab);
+        timer = (TextView) findViewById(R.id.timer);
 
-        stopService = (Button)findViewById(R.id.stop);
+        stopService = (Button) findViewById(R.id.stop);
 
         stopService.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -77,59 +107,33 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         fab.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                 intent = new Intent(MainActivity.this, TimerIntentService.class);
+                intent = new Intent(MainActivity.this, TimerIntentService.class);
                 startService(intent);
             }
         });
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
         mapView = (MapView) findViewById(R.id.map_view);
         mapView.onCreate(savedInstanceState);
-       mapView.getMapAsync(new OnMapReadyCallback() {
-           @Override
-           public void onMapReady(GoogleMap googleMap) {
-               mMap = googleMap;
-               mMap.setMapType(GoogleMap.MAP_TYPE_NORMAL);
-               mapView.onResume();
-               if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                   if (ContextCompat.checkSelfPermission(MainActivity.this,
-                           Manifest.permission.ACCESS_FINE_LOCATION)
-                           == PackageManager.PERMISSION_GRANTED) {
-                       buildGoogleApiClient();
-                       mMap.setMyLocationEnabled(true);
-                   }
-               }
-               else {
-                   buildGoogleApiClient();
-                   mMap.setMyLocationEnabled(true);
-               }
-           }
-       });
+        mapView.getMapAsync(new OnMapReadyCallback() {
+            @Override
+            public void onMapReady(GoogleMap googleMap) {
+                mMap = googleMap;
+                mMap.setMapType(GoogleMap.MAP_TYPE_NORMAL);
+                mapView.onResume();
+                if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    if (ContextCompat.checkSelfPermission(MainActivity.this,
+                            Manifest.permission.ACCESS_FINE_LOCATION)
+                            == PackageManager.PERMISSION_GRANTED) {
+                        buildGoogleApiClient();
+                        mMap.setMyLocationEnabled(true);
+                    }
+                } else {
+                    buildGoogleApiClient();
+                    mMap.setMyLocationEnabled(true);
+                }
+            }
+        });
 
 
 //http://stackoverflow.com/questions/17152847/create-wifi-hotspot-configuration-in-android
@@ -223,34 +227,61 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
         @Override
         public void onReceive(Context context, Intent intent) {
-            int minutes = intent.getIntExtra("minutes",0);
-            int seconds = intent.getIntExtra("seconds",0);
-            Log.d("stas", seconds +"sec in broadcast");
+            int minutes = intent.getIntExtra("minutes", 0);
+            int seconds = intent.getIntExtra("seconds", 0);
+            Log.d("stas", seconds + "sec in broadcast");
             timer.setText(String.format("%02d:%02d", minutes, seconds));
         }
     }
 
 
+ /*   private BroadcastReceiver receiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            int minutes = intent.getIntExtra("minutes",0);
+            int seconds = intent.getIntExtra("seconds",0);
+            Log.d("stas1", seconds +"sec in broadcast2");
+            timer.setText(String.format("%02d:%02d", minutes, seconds));
+        }
+    };*/
+
     @Override
     protected void onResume() {
+
         super.onResume();
         mMyBroadcastReceiver = new MyBroadcastReceiver();
         // регистрируем BroadcastReceiver
         IntentFilter intentFilter = new IntentFilter(TimerIntentService.ACTION);
         intentFilter.addCategory(Intent.CATEGORY_DEFAULT);
         registerReceiver(mMyBroadcastReceiver, intentFilter);
+        // LocalBroadcastManager.getInstance(this).registerReceiver(receiver, intentFilter);
+
     }
 
     @Override
     protected void onDestroy() {
+
         super.onDestroy();
         unregisterReceiver(mMyBroadcastReceiver);
+        //  LocalBroadcastManager.getInstance(this).unregisterReceiver(receiver);
+
     }
 
     @Override
     protected void onPause() {
+
         super.onPause();
         unregisterReceiver(mMyBroadcastReceiver);
+        //LocalBroadcastManager.getInstance(this).unregisterReceiver(receiver);
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+      /*  if (bound) {
+            unbindService(connection);
+            bound = false;
+        }*/
     }
 }
 
