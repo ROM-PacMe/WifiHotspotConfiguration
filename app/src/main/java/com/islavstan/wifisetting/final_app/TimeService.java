@@ -3,18 +3,24 @@ package com.islavstan.wifisetting.final_app;
 import android.app.Notification;
 import android.app.PendingIntent;
 import android.app.Service;
+import android.content.Context;
 import android.content.Intent;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.os.Binder;
 import android.os.IBinder;
+import android.os.Message;
 import android.os.SystemClock;
 import android.support.v4.app.NotificationCompat;
 import android.util.Log;
 
 import com.islavstan.wifisetting.R;
 
+import java.lang.ref.WeakReference;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
+import android.os.Handler;
 
 import rx.android.schedulers.AndroidSchedulers;
 import rx.schedulers.Schedulers;
@@ -37,6 +43,7 @@ public class TimeService extends Service {
 
     // Foreground notification id
     private static final int NOTIFICATION_ID = 1;
+    private final static int MSG_CHECK_INTERNET = 100;
 
     // Service binder
     private final IBinder serviceBinder = new TimeService.RunServiceBinder();
@@ -46,10 +53,11 @@ public class TimeService extends Service {
     SimpleDateFormat df = new SimpleDateFormat("dd-MMM-yyyy");
     String date = df.format(c.getTime());
 
+    private final Handler mUpdateTimeHandler = new TimeService.CheckHandler(this);
+    boolean internet = true;
 
     public class RunServiceBinder extends Binder {
         TimeService getService() {
-
             return TimeService.this;
         }
     }
@@ -60,14 +68,14 @@ public class TimeService extends Service {
             Log.v(TAG, "Creating service");
         }
 
-         dbMethods = new DBMethods(getApplicationContext());
-        Log.d("stas","date = "+ date);
+        dbMethods = new DBMethods(getApplicationContext());
+        Log.d("stas", "date = " + date);
         dbMethods.checkDate(date)
                 .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(result -> {
                     if (result == 1) {
-                       Log.d("stas","result = "+ result);
+                        Log.d("stas", "result = " + result);
                         dbMethods.getTime(date)
                                 .map(Long::parseLong)
                                 .subscribeOn(Schedulers.io())
@@ -76,7 +84,7 @@ public class TimeService extends Service {
                                     if (time != null)
                                         timeSwapBuff = time;
                                 });
-                    }else   Log.d("stas","result = "+ result);
+                    } else Log.d("stas", "result = " + result);
                         }
                 );
 
@@ -110,15 +118,13 @@ public class TimeService extends Service {
         }
     }
 
-    /**
-     * Starts the timer
-     */
+
     public void startTimer() {
         if (!isTimerRunning) {
-            // startTime = System.currentTimeMillis();
             startTime = SystemClock.uptimeMillis();
-
             isTimerRunning = true;
+            internet = true;
+            mUpdateTimeHandler.sendEmptyMessage(MSG_CHECK_INTERNET);
         } else {
             Log.e(TAG, "startTimer request for an already running timer");
         }
@@ -136,6 +142,7 @@ public class TimeService extends Service {
                     .subscribe();
 
             isTimerRunning = false;
+            mUpdateTimeHandler.removeMessages(MSG_CHECK_INTERNET);
         } else {
             Log.e(TAG, "stopTimer request for a timer that isn't running");
         }
@@ -147,17 +154,40 @@ public class TimeService extends Service {
     }
 
 
+    private void checkInternet() {
+        Log.d("stas", "checkInternet");
+        if (!isMobileConnected(getApplicationContext())) {
+            Log.d("stas", "stop timer from checkInternet");
+            stopTimer();
+            mUpdateTimeHandler.removeMessages(MSG_CHECK_INTERNET);
+            internet = false;
+           // stopSelf();
+        }
 
+
+    }
+
+
+    public boolean isMobileConnected(Context context) {
+        ConnectivityManager connManager = (ConnectivityManager) context
+                .getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo netInfo = connManager.getNetworkInfo(ConnectivityManager.TYPE_MOBILE);
+        return ((netInfo != null) && netInfo.isConnected());
+    }
 
 
     public String getTime() {
-        timeInMilliseconds = SystemClock.uptimeMillis() - startTime;
-        updatedTime = timeSwapBuff + timeInMilliseconds;
-        int seconds = (int) (updatedTime / 1000);
-        int hours = seconds / 3600;
-        int minutes = seconds / 60;
-        seconds = seconds % 60;
-        return String.format("%02d:%02d:%02d", hours, minutes, seconds);
+        if(!internet){
+            return null;
+        }else {
+            timeInMilliseconds = SystemClock.uptimeMillis() - startTime;
+            updatedTime = timeSwapBuff + timeInMilliseconds;
+            int seconds = (int) (updatedTime / 1000);
+            int hours = seconds / 3600;
+            int minutes = seconds / 60;
+            seconds = seconds % 60;
+            return String.format("%02d:%02d:%02d", hours, minutes, seconds);
+        }
     }
 
 
@@ -193,5 +223,25 @@ public class TimeService extends Service {
         builder.setContentIntent(resultPendingIntent);
 
         return builder.build();
+    }
+
+
+    private static class CheckHandler extends Handler {
+        private final static int UPDATE_RATE_MS = 20000;
+        private final WeakReference<TimeService> service;
+
+        CheckHandler(TimeService service) {
+            this.service = new WeakReference<>(service);
+        }
+
+        @Override
+        public void handleMessage(Message msg) {
+            if (MSG_CHECK_INTERNET == msg.what) {
+                service.get().checkInternet();
+                sendEmptyMessageDelayed(MSG_CHECK_INTERNET, UPDATE_RATE_MS);
+
+            }
+
+        }
     }
 }

@@ -54,7 +54,7 @@ public class TimeActivity extends AppCompatActivity {
             @Override
             public void onClick(View v) {
 
-                if (!isMobileConnected(TimeActivity.this)) {//если есть интернет то запускаем таймер и вайфай раздачу
+                if (isMobileConnected(TimeActivity.this)) {//если есть интернет то запускаем таймер и вайфай раздачу
                   //  onWifiHotspot();
                     if (serviceBound && !timeService.isTimerRunning()) {
                         Log.d("stas", "Starting timer");
@@ -69,15 +69,12 @@ public class TimeActivity extends AppCompatActivity {
             }
         });
 
-        stopService.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                if (serviceBound && timeService.isTimerRunning()) {
-                    Log.d("stas", "Stopping timer");
-                    timeService.stopTimer();
-                    mUpdateTimeHandler.removeMessages(MSG_UPDATE_TIME);
+        stopService.setOnClickListener(v -> {
+            if (serviceBound && timeService.isTimerRunning()) {
+                Log.d("stas", "Stopping timer");
+                timeService.stopTimer();
+                mUpdateTimeHandler.removeMessages(MSG_UPDATE_TIME);
 
-                }
             }
         });
 
@@ -185,6 +182,7 @@ public class TimeActivity extends AppCompatActivity {
             timeService.background();
             if (timeService.isTimerRunning()) {
                 mUpdateTimeHandler.sendEmptyMessage(MSG_UPDATE_TIME);
+                Log.d("stas", "sendEmptyMessage from ServiceConnection");
             }
 
         }
@@ -198,21 +196,23 @@ public class TimeActivity extends AppCompatActivity {
 
     private void updateUITimer() {
         if (serviceBound) {
-           // timer.setText(timeService.elapsedTime() + " seconds");
-            timer.setText(timeService.getTime());
+            if (timeService.getTime() == null) {
+                Log.d("stas", "internet = false");
+                mUpdateTimeHandler.removeMessages(MSG_UPDATE_TIME);
+            } else
+
+                timer.setText(timeService.getTime());
         }
     }
 
-    /**
-     * When the timer is running, use this handler to update
-     * the UI every second to show timer progress
-     */
+
    private static class UIUpdateHandler extends Handler {
 
         private final static int UPDATE_RATE_MS = 1000;
         private final WeakReference<TimeActivity> activity;
 
         UIUpdateHandler(TimeActivity activity) {
+
             this.activity = new WeakReference<>(activity);
         }
 
