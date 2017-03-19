@@ -50,23 +50,20 @@ public class TimeActivity extends AppCompatActivity {
         stopService = (Button) findViewById(R.id.stop);
 
 
-        fab.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
+        fab.setOnClickListener(v -> {
 
-                if (isMobileConnected(TimeActivity.this)) {//если есть интернет то запускаем таймер и вайфай раздачу
-                  //  onWifiHotspot();
-                    if (serviceBound && !timeService.isTimerRunning()) {
-                        Log.d("stas", "Starting timer");
-                        timeService.startTimer();
-                        mUpdateTimeHandler.sendEmptyMessage(MSG_UPDATE_TIME);
-                    }
+            if (isMobileConnected(TimeActivity.this)) {//если есть интернет то запускаем таймер и вайфай раздачу
+                onWifiHotspot();
+                if (serviceBound && !timeService.isTimerRunning()) {
+                    Log.d("stas", "Starting timer");
+                    timeService.startTimer();
+                    mUpdateTimeHandler.sendEmptyMessage(MSG_UPDATE_TIME);
+                }
 
 
-                } else showNo3gpDialog();
+            } else showNo3gpDialog();
 
 
-            }
         });
 
         stopService.setOnClickListener(v -> {
@@ -124,11 +121,7 @@ public class TimeActivity extends AppCompatActivity {
                 .setMessage("Для работы сервиса включите мобильный интернет!")
                 .setCancelable(true)
                 .setNegativeButton("ОК",
-                        new DialogInterface.OnClickListener() {
-                            public void onClick(DialogInterface dialog, int id) {
-                                dialog.cancel();
-                            }
-                        });
+                        (dialog, id) -> dialog.cancel());
         AlertDialog alert = builder.create();
         alert.show();
 
