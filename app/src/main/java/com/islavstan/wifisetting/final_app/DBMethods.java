@@ -7,6 +7,11 @@ import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.util.Log;
 
+import com.islavstan.wifisetting.model.Day;
+
+import java.util.ArrayList;
+import java.util.List;
+
 import rx.Observable;
 
 public class DBMethods {
@@ -66,5 +71,38 @@ public class DBMethods {
         });
     }
 
+    public Observable<List<Day>> getDaysList() {
+        return Observable.create(subscriber -> {
+            List<Day> list = new ArrayList<>();
+            Cursor c = db.rawQuery("SELECT * FROM wifi", null);
+            if (c.moveToFirst()) {
+                do {
+                    String date = c.getString(c.getColumnIndex("date"));
+                    String time = c.getString(c.getColumnIndex("time"));
+                    Day day = new Day(date, time);
+                    list.add(day);
+
+
+                } while (c.moveToNext());
+
+            }
+            c.close();
+            subscriber.onNext(list);
+
+        });
+
+    }
+
+    public Observable<Integer> getDaysCount() {
+        return Observable.create(subscriber -> {
+            Cursor c = db.rawQuery("SELECT * FROM wifi", null);
+            int cnt = c.getCount();
+            c.close();
+            subscriber.onNext(cnt);
+        });
+
+    }
 
 }
+
+

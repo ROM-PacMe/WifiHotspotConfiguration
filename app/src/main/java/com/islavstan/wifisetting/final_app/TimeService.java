@@ -15,6 +15,8 @@ import android.support.v4.app.NotificationCompat;
 import android.util.Log;
 
 import com.islavstan.wifisetting.R;
+import com.islavstan.wifisetting.api.ApiClient;
+import com.islavstan.wifisetting.points.Point;
 
 import java.lang.ref.WeakReference;
 import java.text.SimpleDateFormat;
@@ -49,9 +51,10 @@ public class TimeService extends Service {
     private final IBinder serviceBinder = new TimeService.RunServiceBinder();
 
 
-    Calendar c = Calendar.getInstance();
+   Calendar c = Calendar.getInstance();
     SimpleDateFormat df = new SimpleDateFormat("dd-MMM-yyyy");
     String date = df.format(c.getTime());
+
 
     private final Handler mUpdateTimeHandler = new TimeService.CheckHandler(this);
     boolean internet = true;
@@ -67,6 +70,7 @@ public class TimeService extends Service {
         if (Log.isLoggable(TAG, Log.VERBOSE)) {
             Log.v(TAG, "Creating service");
         }
+
 
         dbMethods = new DBMethods(getApplicationContext());
         Log.d("stas", "date = " + date);
@@ -92,6 +96,28 @@ public class TimeService extends Service {
         startTime = 0;
         endTime = 0;
         isTimerRunning = false;
+    }
+
+
+
+    private String getTodayDate() {
+        final String[] date = new String[1];
+        final Point apiService = ApiClient.getRxRetrofit().create(Point.class);
+        apiService.retrieveDate("e65837978381fdb0634e294698dca5d6", "getDate")
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(dateResponse -> {
+                    if (dateResponse.isSuccessful()) {
+                        com.islavstan.wifisetting.model.Date d = dateResponse.body();
+                        date[0] = d.getDate();
+
+                    }
+
+
+                }, error -> Log.d("stas", "getTodayDate error = " + error.getMessage()));
+
+
+        return date[0];
     }
 
     @Override

@@ -37,6 +37,8 @@ public class TimeActivity extends AppCompatActivity {
     // Handler to update the UI every second when the timer is running
     private final Handler mUpdateTimeHandler = new TimeActivity.UIUpdateHandler(this);
 
+
+
     // Message type for the handler
     private final static int MSG_UPDATE_TIME = 0;
 
@@ -53,7 +55,7 @@ public class TimeActivity extends AppCompatActivity {
         fab.setOnClickListener(v -> {
 
             if (isMobileConnected(TimeActivity.this)) {//если есть интернет то запускаем таймер и вайфай раздачу
-                onWifiHotspot();
+               // onWifiHotspot();
                 if (serviceBound && !timeService.isTimerRunning()) {
                     Log.d("stas", "Starting timer");
                     timeService.startTimer();
