@@ -79,7 +79,8 @@ public class DBMethods {
                 do {
                     String date = c.getString(c.getColumnIndex("date"));
                     String time = c.getString(c.getColumnIndex("time"));
-                    Day day = new Day(date, time);
+                    int number = c.getInt(c.getColumnIndex("id"));
+                    Day day = new Day(date, time, number);
                     list.add(day);
 
 

@@ -33,8 +33,23 @@ public class WifiDaysRecAdapter extends RecyclerView.Adapter<WifiDaysRecAdapter.
     public void onBindViewHolder(CustomViewHolder holder, int position) {
         Day day = daysList.get(position);
         holder.date.setText(day.getDate());
-        holder.time.setText(day.getTime());
+        holder.time.setText(getCorrectTime(Long.valueOf(day.getTime())));
+        holder.number.setText(day.getNumber() + ".");
     }
+
+
+
+    private String getCorrectTime(long time){
+        int seconds = (int) (time / 1000);
+        int hours = seconds / 3600;
+        int minutes = seconds / 60;
+        seconds = seconds % 60;
+        return String.format("%02d:%02d", hours, minutes);
+
+
+
+    }
+
 
     @Override
     public int getItemCount() {
@@ -45,11 +60,13 @@ public class WifiDaysRecAdapter extends RecyclerView.Adapter<WifiDaysRecAdapter.
     class CustomViewHolder extends RecyclerView.ViewHolder {
         TextView date;
         TextView time;
+        TextView number;
 
         public CustomViewHolder(View itemView) {
             super(itemView);
             date = (TextView) itemView.findViewById(R.id.date);
             time = (TextView) itemView.findViewById(R.id.time);
+            number = (TextView) itemView.findViewById(R.id.number);
 
 
         }

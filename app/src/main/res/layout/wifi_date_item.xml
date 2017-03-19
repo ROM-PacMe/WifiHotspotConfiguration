@@ -6,8 +6,21 @@
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+      android:layout_marginLeft="16dp"
+        android:layout_marginTop="16dp"
+        android:layout_marginBottom="16dp"
+        android:id="@+id/number"
+        android:text="1."
+        android:textSize="20sp"
+
+        />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
         android:layout_margin="16dp"
         android:textSize="20sp"
+        android:layout_toRightOf="@+id/number"
         android:id="@+id/date"
         android:text="12.02.2017"/>
     <TextView

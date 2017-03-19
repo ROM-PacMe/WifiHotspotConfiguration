@@ -5,6 +5,8 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.ServiceConnection;
+
+import android.graphics.Color;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.net.wifi.WifiConfiguration;
@@ -15,6 +17,9 @@ import android.os.Message;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.support.v7.widget.DefaultItemAnimator;
+import android.support.v7.widget.LinearLayoutManager;
+import android.support.v7.widget.RecyclerView;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
@@ -22,98 +27,153 @@ import android.widget.TextView;
 
 import com.github.clans.fab.FloatingActionButton;
 import com.islavstan.wifisetting.R;
+import com.islavstan.wifisetting.adapter.WifiDaysRecAdapter;
+import com.islavstan.wifisetting.model.Day;
 
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.List;
 
 import cc.mvdan.accesspoint.WifiApControl;
+import rx.Observable;
+import rx.android.schedulers.AndroidSchedulers;
+import rx.schedulers.Schedulers;
 
 public class TimeActivity extends AppCompatActivity {
     FloatingActionButton fab;
-    Button stopService;
     TextView timer;
     private boolean serviceBound;
     private TimeService timeService;
     // Handler to update the UI every second when the timer is running
     private final Handler mUpdateTimeHandler = new TimeActivity.UIUpdateHandler(this);
-
-
+    RecyclerView recycler;
+    WifiDaysRecAdapter adapter;
+    DBMethods dbMethods;
+    TextView daysOnline;
 
     // Message type for the handler
     private final static int MSG_UPDATE_TIME = 0;
+    List<Day> dayList = new ArrayList<>();
+    boolean fabPressed = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-
+        dbMethods = new DBMethods(this);
         fab = (FloatingActionButton) findViewById(R.id.fab);
         timer = (TextView) findViewById(R.id.timer);
-        stopService = (Button) findViewById(R.id.stop);
 
 
         fab.setOnClickListener(v -> {
+            if (!fabPressed) {
 
-            if (isMobileConnected(TimeActivity.this)) {//если есть интернет то запускаем таймер и вайфай раздачу
-               // onWifiHotspot();
-                if (serviceBound && !timeService.isTimerRunning()) {
-                    Log.d("stas", "Starting timer");
-                    timeService.startTimer();
-                    mUpdateTimeHandler.sendEmptyMessage(MSG_UPDATE_TIME);
+                if (isMobileConnected(TimeActivity.this)) {//если есть интернет то запускаем таймер и вайфай раздачу
+
+                    onWifiHotspot()
+                            .subscribeOn(Schedulers.io())
+                            .observeOn(AndroidSchedulers.mainThread())
+                            .subscribe();
+
+                    if (serviceBound && !timeService.isTimerRunning()) {
+                        Log.d("stas", "Starting timer");
+                        timeService.startTimer();
+                        mUpdateTimeHandler.sendEmptyMessage(MSG_UPDATE_TIME);
+                        fabPressed = true;
+                        fab.setColorNormal(Color.parseColor("#4CAF50"));
+                        fab.setColorPressed(Color.parseColor("#43A047"));
+                    }
+
+
+                } else showNo3gpDialog();
+
+            } else {
+                if (serviceBound && timeService.isTimerRunning()) {
+                    Log.d("stas", "Stopping timer");
+                    timeService.stopTimer();
+                    mUpdateTimeHandler.removeMessages(MSG_UPDATE_TIME);
+                    fabPressed = false;
+                    fab.setColorNormal(Color.parseColor("#FF5722"));
+                    fab.setColorPressed(Color.parseColor("#FF7043"));
+
                 }
 
-
-            } else showNo3gpDialog();
-
-
-        });
-
-        stopService.setOnClickListener(v -> {
-            if (serviceBound && timeService.isTimerRunning()) {
-                Log.d("stas", "Stopping timer");
-                timeService.stopTimer();
-                mUpdateTimeHandler.removeMessages(MSG_UPDATE_TIME);
-
             }
+
+
         });
+
+
+        setAdapter();
+        setDaysOnline();
+    }
+
+
+    private Observable<Void> onWifiHotspot() {
+        return Observable.create(subscriber -> {
+
+
+            WifiManager wifiManager = (WifiManager) getSystemService(Context.WIFI_SERVICE);
+            if (wifiManager.isWifiEnabled()) {
+                wifiManager.setWifiEnabled(false);
+            }
+            WifiConfiguration netConfig = new WifiConfiguration();
+            netConfig.SSID = "VOMER";
+            netConfig.allowedAuthAlgorithms.set(WifiConfiguration.AuthAlgorithm.OPEN);
+            netConfig.allowedProtocols.set(WifiConfiguration.Protocol.RSN);
+            netConfig.allowedProtocols.set(WifiConfiguration.Protocol.WPA);
+            netConfig.allowedKeyManagement.set(WifiConfiguration.KeyMgmt.NONE);
+            try {
+                Method setWifiApMethod = wifiManager.getClass().getMethod("setWifiApEnabled", WifiConfiguration.class, boolean.class);
+                boolean apstatus = (Boolean) setWifiApMethod.invoke(wifiManager, netConfig, true);
+
+                Method isWifiApEnabledmethod = wifiManager.getClass().getMethod("isWifiApEnabled");
+                while (!(Boolean) isWifiApEnabledmethod.invoke(wifiManager)) {
+                }
+                ;
+                Method getWifiApStateMethod = wifiManager.getClass().getMethod("getWifiApState");
+                int apstate = (Integer) getWifiApStateMethod.invoke(wifiManager);
+                Method getWifiApConfigurationMethod = wifiManager.getClass().getMethod("getWifiApConfiguration");
+                netConfig = (WifiConfiguration) getWifiApConfigurationMethod.invoke(wifiManager);
+                Log.d("stas", "\nSSID:" + netConfig.SSID + "\nPassword:" + netConfig.preSharedKey + "\n");
+
+            } catch (Exception e) {
+                Log.e(this.getClass().toString(), "", e);
+            }
+
+            WifiApControl apControl = WifiApControl.getInstance(this);
+
+            apControl.enable();
+        });
+
+    }
+
+
+    private void setAdapter() {
+        dbMethods.getDaysList()
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(list -> dayList.addAll(list), error -> Log.d("stas", "getDaysList error = " + error.getMessage()));
+
+
+        recycler = (RecyclerView) findViewById(R.id.recycler);
+        adapter = new WifiDaysRecAdapter(dayList);
+        RecyclerView.LayoutManager mLayoutManager = new LinearLayoutManager(this);
+        recycler.setLayoutManager(mLayoutManager);
+        recycler.setItemAnimator(new DefaultItemAnimator());
+        recycler.setAdapter(adapter);
 
 
     }
 
 
-    private void onWifiHotspot() {
-        WifiManager wifiManager = (WifiManager) getSystemService(Context.WIFI_SERVICE);
-        if (wifiManager.isWifiEnabled()) {
-            wifiManager.setWifiEnabled(false);
-        }
-        WifiConfiguration netConfig = new WifiConfiguration();
-        netConfig.SSID = "VOMER";
-        netConfig.allowedAuthAlgorithms.set(WifiConfiguration.AuthAlgorithm.OPEN);
-        netConfig.allowedProtocols.set(WifiConfiguration.Protocol.RSN);
-        netConfig.allowedProtocols.set(WifiConfiguration.Protocol.WPA);
-        netConfig.allowedKeyManagement.set(WifiConfiguration.KeyMgmt.NONE);
-        try {
-            Method setWifiApMethod = wifiManager.getClass().getMethod("setWifiApEnabled", WifiConfiguration.class, boolean.class);
-            boolean apstatus = (Boolean) setWifiApMethod.invoke(wifiManager, netConfig, true);
-
-            Method isWifiApEnabledmethod = wifiManager.getClass().getMethod("isWifiApEnabled");
-            while (!(Boolean) isWifiApEnabledmethod.invoke(wifiManager)) {
-            }
-            ;
-            Method getWifiApStateMethod = wifiManager.getClass().getMethod("getWifiApState");
-            int apstate = (Integer) getWifiApStateMethod.invoke(wifiManager);
-            Method getWifiApConfigurationMethod = wifiManager.getClass().getMethod("getWifiApConfiguration");
-            netConfig = (WifiConfiguration) getWifiApConfigurationMethod.invoke(wifiManager);
-            Log.d("stas", "\nSSID:" + netConfig.SSID + "\nPassword:" + netConfig.preSharedKey + "\n");
-
-        } catch (Exception e) {
-            Log.e(this.getClass().toString(), "", e);
-        }
-
-        WifiApControl apControl = WifiApControl.getInstance(this);
-
-        apControl.enable();
-
+    private void setDaysOnline() {
+        daysOnline = (TextView) findViewById(R.id.daysOnline);
+        dbMethods.getDaysCount()
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(days -> daysOnline.setText("Дней онлайн: " + days + "/30"), error -> Log.d("stas", "getDaysCount error = " + error.getMessage()));
     }
 
 
@@ -201,7 +261,7 @@ public class TimeActivity extends AppCompatActivity {
     }
 
 
-   private static class UIUpdateHandler extends Handler {
+    private static class UIUpdateHandler extends Handler {
 
         private final static int UPDATE_RATE_MS = 1000;
         private final WeakReference<TimeActivity> activity;

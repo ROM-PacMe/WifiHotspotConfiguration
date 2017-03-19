@@ -5,6 +5,15 @@ package com.islavstan.wifisetting.model;
 public class Day {
     String date;
     String time;
+    int number;
+
+    public int getNumber() {
+        return number;
+    }
+
+    public void setNumber(int number) {
+        this.number = number;
+    }
 
     public String getDate() {
         return date;
@@ -22,8 +31,9 @@ public class Day {
         this.time = time;
     }
 
-    public Day(String date, String time) {
+    public Day(String date, String time, int number) {
         this.date = date;
         this.time = time;
+        this.number = number;
     }
 }
