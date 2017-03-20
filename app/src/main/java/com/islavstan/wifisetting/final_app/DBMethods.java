@@ -81,7 +81,7 @@ public class DBMethods {
                     String time = c.getString(c.getColumnIndex("time"));
                     int number = c.getInt(c.getColumnIndex("id"));
                     Day day = new Day(date, time, number);
-                    list.add(day);
+                    list.add(0, day);
 
 
                 } while (c.moveToNext());

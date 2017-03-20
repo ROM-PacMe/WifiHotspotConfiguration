@@ -1,19 +1,26 @@
 package com.islavstan.wifisetting.final_app;
 
+import android.Manifest;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.ServiceConnection;
 
+import android.content.pm.PackageManager;
 import android.graphics.Color;
+import android.location.Location;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.net.wifi.WifiConfiguration;
 import android.net.wifi.WifiManager;
+import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
+import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
+import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
@@ -26,6 +33,13 @@ import android.widget.Button;
 import android.widget.TextView;
 
 import com.github.clans.fab.FloatingActionButton;
+import com.google.android.gms.maps.CameraUpdate;
+import com.google.android.gms.maps.CameraUpdateFactory;
+import com.google.android.gms.maps.model.Circle;
+import com.google.android.gms.maps.model.CircleOptions;
+import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.Marker;
+import com.google.android.gms.maps.model.MarkerOptions;
 import com.islavstan.wifisetting.R;
 import com.islavstan.wifisetting.adapter.WifiDaysRecAdapter;
 import com.islavstan.wifisetting.model.Day;
@@ -34,13 +48,22 @@ import java.lang.ref.WeakReference;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
-
+import com.google.android.gms.common.ConnectionResult;
+import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.location.LocationListener;
+import com.google.android.gms.location.LocationServices;
+import com.google.android.gms.maps.GoogleMap;
+import com.google.android.gms.maps.MapView;
+import com.google.android.gms.maps.OnMapReadyCallback;
 import cc.mvdan.accesspoint.WifiApControl;
 import rx.Observable;
 import rx.android.schedulers.AndroidSchedulers;
 import rx.schedulers.Schedulers;
 
-public class TimeActivity extends AppCompatActivity {
+public class TimeActivity extends AppCompatActivity implements OnMapReadyCallback,
+        GoogleApiClient.ConnectionCallbacks,
+        GoogleApiClient.OnConnectionFailedListener,
+        LocationListener {
     FloatingActionButton fab;
     TextView timer;
     private boolean serviceBound;
@@ -56,6 +79,16 @@ public class TimeActivity extends AppCompatActivity {
     private final static int MSG_UPDATE_TIME = 0;
     List<Day> dayList = new ArrayList<>();
     boolean fabPressed = false;
+
+    MapView mapView;
+    GoogleMap mMap;
+    GoogleApiClient mGoogleApiClient;
+    Circle mCircle;
+    Marker mMarker;
+
+    boolean moveCamera = true;
+
+    //http://stackoverflow.com/questions/14826345/android-maps-api-v2-change-mylocation-icon
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -105,9 +138,109 @@ public class TimeActivity extends AppCompatActivity {
         });
 
 
+
         setAdapter();
         setDaysOnline();
+        setMap(savedInstanceState);
     }
+
+
+
+
+
+
+
+
+
+    private void setMap(Bundle savedInstanceState){
+
+        mapView = (MapView) findViewById(R.id.map_view);
+        mapView.onCreate(savedInstanceState);
+        mapView.getMapAsync(googleMap -> {
+            mMap = googleMap;
+            mMap.setMapType(GoogleMap.MAP_TYPE_NORMAL);
+            mapView.onResume();
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                if (ContextCompat.checkSelfPermission(TimeActivity.this,
+                        Manifest.permission.ACCESS_FINE_LOCATION)
+                        == PackageManager.PERMISSION_GRANTED) {
+                    buildGoogleApiClient();
+                    mMap.setMyLocationEnabled(true);
+
+                }
+            }
+            else {
+                buildGoogleApiClient();
+                mMap.setMyLocationEnabled(true);
+
+
+
+
+            }
+
+
+
+
+            mMap.setOnMyLocationChangeListener(location -> {
+
+                if(moveCamera) {
+
+                    CameraUpdate center = CameraUpdateFactory.newLatLng(new LatLng(location.getLatitude(), location.getLongitude()));
+                    CameraUpdate zoom = CameraUpdateFactory.zoomTo(11);
+                    mMap.moveCamera(center);
+                    mMap.animateCamera(zoom);
+                    moveCamera = false;
+                }
+
+
+
+              /*  LatLng latLng = new LatLng(location.getLatitude(), location.getLongitude());
+                if(mCircle == null || mMarker == null){
+                    drawMarkerWithCircle(latLng);
+                }else{
+                    updateMarkerWithCircle(latLng);
+                }
+
+*/
+
+
+
+
+            });
+        });
+
+
+
+    }
+
+
+    private void drawMarkerWithCircle(LatLng position){
+        double radiusInMeters = 100.0;
+        int strokeColor = 0xffff0000; //red outline
+        int shadeColor = 0x44ff0000; //opaque red fill
+
+        CircleOptions circleOptions = new CircleOptions().center(position).radius(radiusInMeters).fillColor(shadeColor).strokeColor(strokeColor).strokeWidth(8);
+        mCircle = mMap.addCircle(circleOptions);
+
+        MarkerOptions markerOptions = new MarkerOptions().position(position);
+        mMarker = mMap.addMarker(markerOptions);
+    }
+    private void updateMarkerWithCircle(LatLng position) {
+        mCircle.setCenter(position);
+        mMarker.setPosition(position);
+    }
+
+    protected synchronized void buildGoogleApiClient() {
+        mGoogleApiClient = new GoogleApiClient.Builder(this)
+                .addConnectionCallbacks(this)
+                .addOnConnectionFailedListener(this)
+                .addApi(LocationServices.API)
+                .build();
+        mGoogleApiClient.connect();
+    }
+
+
+
 
 
     private Observable<Void> onWifiHotspot() {
@@ -129,9 +262,7 @@ public class TimeActivity extends AppCompatActivity {
                 boolean apstatus = (Boolean) setWifiApMethod.invoke(wifiManager, netConfig, true);
 
                 Method isWifiApEnabledmethod = wifiManager.getClass().getMethod("isWifiApEnabled");
-                while (!(Boolean) isWifiApEnabledmethod.invoke(wifiManager)) {
-                }
-                ;
+                while (!(Boolean) isWifiApEnabledmethod.invoke(wifiManager)) {};
                 Method getWifiApStateMethod = wifiManager.getClass().getMethod("getWifiApState");
                 int apstate = (Integer) getWifiApStateMethod.invoke(wifiManager);
                 Method getWifiApConfigurationMethod = wifiManager.getClass().getMethod("getWifiApConfiguration");
@@ -258,6 +389,31 @@ public class TimeActivity extends AppCompatActivity {
 
                 timer.setText(timeService.getTime());
         }
+    }
+
+    @Override
+    public void onConnected(@Nullable Bundle bundle) {
+
+    }
+
+    @Override
+    public void onConnectionSuspended(int i) {
+
+    }
+
+    @Override
+    public void onConnectionFailed(@NonNull ConnectionResult connectionResult) {
+
+    }
+
+    @Override
+    public void onLocationChanged(Location location) {
+
+    }
+
+    @Override
+    public void onMapReady(GoogleMap googleMap) {
+
     }
 
 
