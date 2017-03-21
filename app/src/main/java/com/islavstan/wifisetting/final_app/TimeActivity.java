@@ -170,15 +170,13 @@ public class TimeActivity extends AppCompatActivity implements OnMapReadyCallbac
             JSONObject jsonObject = new JSONObject(a);
             String longitude = jsonObject.getString("longitude");
             String latitude = jsonObject.getString("latitude");
-
             Log.d("stas", jsonObject.toString());
             LatLng latLng = new LatLng( Double.parseDouble(longitude),Double.parseDouble(latitude));
             MarkerOptions markerOptions = new MarkerOptions();
             markerOptions.position(latLng);
+            markerOptions.title("привет Серый");
             Marker m = mMap.addMarker(markerOptions);
             m.setIcon(BitmapDescriptorFactory.fromResource(R.drawable.map2));
-
-
         } catch (JSONException e) {
             e.printStackTrace();
         }
