@@ -2,12 +2,14 @@ package com.islavstan.wifisetting.final_app;
 
 import android.Manifest;
 import android.content.ComponentName;
+import android.content.ContentValues;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.ServiceConnection;
 
 import android.content.pm.PackageManager;
+import android.database.sqlite.SQLiteDatabase;
 import android.graphics.Color;
 import android.location.Location;
 import android.net.ConnectivityManager;
@@ -41,6 +43,8 @@ import com.google.android.gms.maps.model.CircleOptions;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import com.islavstan.wifisetting.R;
 import com.islavstan.wifisetting.adapter.WifiDaysRecAdapter;
 import com.islavstan.wifisetting.model.Day;
@@ -48,6 +52,7 @@ import com.islavstan.wifisetting.model.Day;
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
@@ -56,6 +61,7 @@ import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.MapView;
 import com.google.android.gms.maps.OnMapReadyCallback;
+import com.islavstan.wifisetting.model.Point;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -156,19 +162,63 @@ public class TimeActivity extends AppCompatActivity implements OnMapReadyCallbac
 
         initSocket();
         socket.on("newLocationWifi", getPoints);
-
+        getContact();
 
     }
 
 
+    public void getContact() {
+
+        socket.emit("GetAllLocatioWifi", 344, (Ack) args -> {
+            Log.d("VOMER_DATA", "GetContactAndroid" + args[0].toString());
+            String str = args[0].toString();
+            JSONObject data = null;
+            try {
+                data = new JSONObject(str);
+                Log.d("stas", "data = " + data);
+                Iterator<String> pointList = data.keys();
+                for (int i = 0; i < data.length(); i++) {
+                    String index = pointList.next();
+                    try {
+                        JSONObject user = data.getJSONObject(index);
+
+                        GsonBuilder builder = new GsonBuilder();
+                        Gson gson = builder.create();
+                        Point point = gson.fromJson(user.toString(), Point.class);
+
+                        String longitude = point.longitude;
+
+                        String latitude = point.latitude;
+                        Log.d("stas", longitude + " " + latitude);
+                        LatLng latLng = new LatLng(Double.parseDouble(longitude), Double.parseDouble(latitude));
+                        final MarkerOptions markerOptions = new MarkerOptions();
+                        markerOptions.position(latLng);
+                        markerOptions.title(point.fio + " " + point.number);
 
 
+                        runOnUiThread(() -> {
+                            Marker m = mMap.addMarker(markerOptions);
+                            Log.d("stas", "runOnUiThread");
+                            m.setIcon(BitmapDescriptorFactory.fromResource(R.drawable.map2));
+                        });
 
-    private Emitter.Listener getPoints = args -> runOnUiThread(() -> {
+                    } catch (JSONException e) {
+                        Log.d("VOMER_DATA", " GetContactAndroid  JSONException = " + e.getMessage());
+                    }
+
+
+                }
+            } catch (JSONException e) {
+                e.printStackTrace();
+            }
+        });
+    }
+
+            private Emitter.Listener getPoints = args -> runOnUiThread(() -> {
       String a = args[0].toString();
         try {
             JSONObject jsonObject = new JSONObject(a);
-            String longitude = jsonObject.getString("longitude");
+          /*  String longitude = jsonObject.getString("longitude");
             String latitude = jsonObject.getString("latitude");
             Log.d("stas", jsonObject.toString());
             LatLng latLng = new LatLng( Double.parseDouble(longitude),Double.parseDouble(latitude));
@@ -176,7 +226,7 @@ public class TimeActivity extends AppCompatActivity implements OnMapReadyCallbac
             markerOptions.position(latLng);
             markerOptions.title("привет Серый");
             Marker m = mMap.addMarker(markerOptions);
-            m.setIcon(BitmapDescriptorFactory.fromResource(R.drawable.map2));
+            m.setIcon(BitmapDescriptorFactory.fromResource(R.drawable.map2));*/
         } catch (JSONException e) {
             e.printStackTrace();
         }
