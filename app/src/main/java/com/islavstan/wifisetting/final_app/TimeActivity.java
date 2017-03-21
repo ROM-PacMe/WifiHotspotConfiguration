@@ -31,6 +31,7 @@ import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.util.Log;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.TextView;
 
@@ -62,11 +63,13 @@ import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.MapView;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.islavstan.wifisetting.model.Point;
+import com.squareup.picasso.Picasso;
 
 import org.json.JSONException;
 import org.json.JSONObject;
 
 import cc.mvdan.accesspoint.WifiApControl;
+import de.hdodenhof.circleimageview.CircleImageView;
 import io.socket.client.Ack;
 import io.socket.client.Socket;
 import io.socket.emitter.Emitter;
@@ -103,6 +106,11 @@ public class TimeActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     boolean moveCamera = true;
 
+    private ViewGroup infoWindow;
+    private TextView infoName;
+    CircleImageView photo;
+
+    int myId = 344;
 
     //http://stackoverflow.com/questions/14826345/android-maps-api-v2-change-mylocation-icon
 
@@ -155,10 +163,31 @@ public class TimeActivity extends AppCompatActivity implements OnMapReadyCallbac
 
         });
 
+       this.infoWindow = (ViewGroup)getLayoutInflater().inflate(R.layout.info_window, null);
+        this.infoName = (TextView)infoWindow.findViewById(R.id.name);
+        this.photo = (CircleImageView)infoWindow.findViewById(R.id.photo);
+
+
 
         setAdapter();
         setDaysOnline();
         setMap(savedInstanceState);
+
+
+
+      /*  mMap.setInfoWindowAdapter(new GoogleMap.InfoWindowAdapter() {
+            @Override
+            public View getInfoWindow(Marker marker) {
+                infoName.setText(marker.getTitle());
+                return null;
+            }
+
+            @Override
+            public View getInfoContents(Marker marker) {
+                return null;
+            }
+        });
+*/
 
         initSocket();
         socket.on("newLocationWifi", getPoints);
@@ -169,7 +198,7 @@ public class TimeActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     public void getContact() {
 
-        socket.emit("GetAllLocatioWifi", 344, (Ack) args -> {
+        socket.emit("getAllLocationWifi", myId, (Ack) args -> {
             Log.d("VOMER_DATA", "GetContactAndroid" + args[0].toString());
             String str = args[0].toString();
             JSONObject data = null;
@@ -193,7 +222,11 @@ public class TimeActivity extends AppCompatActivity implements OnMapReadyCallbac
                         LatLng latLng = new LatLng(Double.parseDouble(longitude), Double.parseDouble(latitude));
                         final MarkerOptions markerOptions = new MarkerOptions();
                         markerOptions.position(latLng);
-                        markerOptions.title(point.fio + " " + point.number);
+                        markerOptions.title(point.fio+"\n"+point.number);
+                        markerOptions.snippet(point.path);
+
+
+
 
 
                         runOnUiThread(() -> {
@@ -215,23 +248,25 @@ public class TimeActivity extends AppCompatActivity implements OnMapReadyCallbac
     }
 
             private Emitter.Listener getPoints = args -> runOnUiThread(() -> {
-      String a = args[0].toString();
-        try {
-            JSONObject jsonObject = new JSONObject(a);
-          /*  String longitude = jsonObject.getString("longitude");
-            String latitude = jsonObject.getString("latitude");
-            Log.d("stas", jsonObject.toString());
-            LatLng latLng = new LatLng( Double.parseDouble(longitude),Double.parseDouble(latitude));
-            MarkerOptions markerOptions = new MarkerOptions();
-            markerOptions.position(latLng);
-            markerOptions.title("привет Серый");
-            Marker m = mMap.addMarker(markerOptions);
-            m.setIcon(BitmapDescriptorFactory.fromResource(R.drawable.map2));*/
-        } catch (JSONException e) {
-            e.printStackTrace();
-        }
+                String a = args[0].toString();
+                GsonBuilder builder = new GsonBuilder();
+                Gson gson = builder.create();
+                Point point = gson.fromJson(a, Point.class);
+                int id = point.userID;
+                if (id != myId) {
+                    String longitude = point.longitude;
+                    String latitude = point.latitude;
+                    Log.d("stas", longitude + " " + latitude);
+                    LatLng latLng = new LatLng(Double.parseDouble(longitude), Double.parseDouble(latitude));
+                    final MarkerOptions markerOptions = new MarkerOptions();
+                    markerOptions.position(latLng);
+                    markerOptions.title(point.fio + "\n" + point.number);
+                    markerOptions.snippet(point.path);
+                    Marker m = mMap.addMarker(markerOptions);
+                    m.setIcon(BitmapDescriptorFactory.fromResource(R.drawable.map2));
+                }
 
-    });
+            });
 
 
 
@@ -248,6 +283,23 @@ public class TimeActivity extends AppCompatActivity implements OnMapReadyCallbac
         mapView.getMapAsync(googleMap -> {
             mMap = googleMap;
             mMap.setMapType(GoogleMap.MAP_TYPE_NORMAL);
+
+            mMap.setInfoWindowAdapter(new GoogleMap.InfoWindowAdapter() {
+                @Override
+                public View getInfoWindow(Marker marker) {
+                   return null;
+                }
+
+                @Override
+                public View getInfoContents(Marker marker) {
+                    infoName.setText(marker.getTitle());
+                    Picasso.with(infoWindow.getContext()).load("https://vomer.com.ua/uploads/min_"+marker.getSnippet()).into(photo);
+                    return infoWindow;
+                }
+            });
+
+
+
             mapView.onResume();
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 if (ContextCompat.checkSelfPermission(TimeActivity.this,
@@ -564,7 +616,7 @@ public class TimeActivity extends AppCompatActivity implements OnMapReadyCallbac
     private void initSocket() {
 
 
-        socket.emit("Vomer syncLogin", 344, 4620700, 8229, 2, new Ack() {
+        socket.emit("Vomer syncLogin", myId, 4620700, 8229, 2, new Ack() {
             @Override
             public void call(Object... args) {
 
