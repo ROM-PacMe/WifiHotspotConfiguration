@@ -35,6 +35,7 @@ import android.widget.TextView;
 import com.github.clans.fab.FloatingActionButton;
 import com.google.android.gms.maps.CameraUpdate;
 import com.google.android.gms.maps.CameraUpdateFactory;
+import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.Circle;
 import com.google.android.gms.maps.model.CircleOptions;
 import com.google.android.gms.maps.model.LatLng;
@@ -55,7 +56,14 @@ import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.MapView;
 import com.google.android.gms.maps.OnMapReadyCallback;
+
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import cc.mvdan.accesspoint.WifiApControl;
+import io.socket.client.Ack;
+import io.socket.client.Socket;
+import io.socket.emitter.Emitter;
 import rx.Observable;
 import rx.android.schedulers.AndroidSchedulers;
 import rx.schedulers.Schedulers;
@@ -80,7 +88,7 @@ public class TimeActivity extends AppCompatActivity implements OnMapReadyCallbac
     private final static int REMOVE_UPDATE = 1;
     List<Day> dayList = new ArrayList<>();
     boolean fabPressed = false;
-
+     public Socket socket;
     MapView mapView;
     GoogleMap mMap;
     GoogleApiClient mGoogleApiClient;
@@ -100,7 +108,7 @@ public class TimeActivity extends AppCompatActivity implements OnMapReadyCallbac
         fab = (FloatingActionButton) findViewById(R.id.fab);
         timer = (TextView) findViewById(R.id.timer);
         WifiManager wifiManager = (WifiManager) getSystemService(Context.WIFI_SERVICE);
-
+        socket = new MySocket(this).GetSocket();
         fab.setOnClickListener(v -> {
             if (!fabPressed) {
 
@@ -146,8 +154,43 @@ public class TimeActivity extends AppCompatActivity implements OnMapReadyCallbac
         setDaysOnline();
         setMap(savedInstanceState);
 
+        initSocket();
+        socket.on("newLocationWifi", getPoints);
+
 
     }
+
+
+
+
+
+    private Emitter.Listener getPoints = args -> runOnUiThread(() -> {
+      String a = args[0].toString();
+        try {
+            JSONObject jsonObject = new JSONObject(a);
+            String longitude = jsonObject.getString("longitude");
+            String latitude = jsonObject.getString("latitude");
+
+            Log.d("stas", jsonObject.toString());
+            LatLng latLng = new LatLng( Double.parseDouble(longitude),Double.parseDouble(latitude));
+            MarkerOptions markerOptions = new MarkerOptions();
+            markerOptions.position(latLng);
+            Marker m = mMap.addMarker(markerOptions);
+            m.setIcon(BitmapDescriptorFactory.fromResource(R.drawable.map2));
+
+
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+
+    });
+
+
+
+
+
+
+
 
 
     private void setMap(Bundle savedInstanceState) {
@@ -178,12 +221,40 @@ public class TimeActivity extends AppCompatActivity implements OnMapReadyCallbac
 
                 if (moveCamera) {
 
+                    socket.emit("newLocationWifi",location.getLatitude(), location.getLongitude() , (Ack) args -> {
+                                JSONObject data = null;
+                                try {
+                                    data = new JSONObject(args[0].toString());
+                                } catch (JSONException e) {
+                                    Log.d("VOMER_DATA", " syncLogin  JSONException = " + e.getMessage());
+                                }
+                                if (data != null) {
+                                    try {
+                                        Log.d("VOMER_DATA", "syncLogin" + data);
+                                        String result = data.getString("result");
+
+                                        if (result.equals("done")) {
+                                            Log.d("stas", "done");
+
+                                        }
+
+                                    } catch (JSONException e) {
+                                        Log.d("VOMER_DATA", " syncLogin  JSONException = " + e.getMessage());
+
+                                    }
+                                }
+                            });
+
+
                     CameraUpdate center = CameraUpdateFactory.newLatLng(new LatLng(location.getLatitude(), location.getLongitude()));
                     CameraUpdate zoom = CameraUpdateFactory.zoomTo(11);
                     mMap.moveCamera(center);
                     mMap.animateCamera(zoom);
                     moveCamera = false;
+
                 }
+
+
 
 
 
@@ -442,5 +513,19 @@ public class TimeActivity extends AppCompatActivity implements OnMapReadyCallbac
         }
     }
 
+    private void initSocket() {
 
+
+        socket.emit("Vomer syncLogin", 344, 4620700, 8229, 2, new Ack() {
+            @Override
+            public void call(Object... args) {
+
+
+                    }
+                });
+
+
+
+
+}
 }
