@@ -53,8 +53,11 @@ import com.islavstan.wifisetting.model.Day;
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
+
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.location.LocationListener;
@@ -97,7 +100,7 @@ public class TimeActivity extends AppCompatActivity implements OnMapReadyCallbac
     private final static int REMOVE_UPDATE = 1;
     List<Day> dayList = new ArrayList<>();
     boolean fabPressed = false;
-     public Socket socket;
+    public Socket socket;
     MapView mapView;
     GoogleMap mMap;
     GoogleApiClient mGoogleApiClient;
@@ -111,6 +114,7 @@ public class TimeActivity extends AppCompatActivity implements OnMapReadyCallbac
     CircleImageView photo;
 
     int myId = 344;
+    Map<Integer, Point> pointsList = new HashMap<>();
 
     //http://stackoverflow.com/questions/14826345/android-maps-api-v2-change-mylocation-icon
 
@@ -163,10 +167,9 @@ public class TimeActivity extends AppCompatActivity implements OnMapReadyCallbac
 
         });
 
-       this.infoWindow = (ViewGroup)getLayoutInflater().inflate(R.layout.info_window, null);
-        this.infoName = (TextView)infoWindow.findViewById(R.id.name);
-        this.photo = (CircleImageView)infoWindow.findViewById(R.id.photo);
-
+        this.infoWindow = (ViewGroup) getLayoutInflater().inflate(R.layout.info_window, null);
+        this.infoName = (TextView) infoWindow.findViewById(R.id.name);
+        this.photo = (CircleImageView) infoWindow.findViewById(R.id.photo);
 
 
         setAdapter();
@@ -174,23 +177,9 @@ public class TimeActivity extends AppCompatActivity implements OnMapReadyCallbac
         setMap(savedInstanceState);
 
 
-
-      /*  mMap.setInfoWindowAdapter(new GoogleMap.InfoWindowAdapter() {
-            @Override
-            public View getInfoWindow(Marker marker) {
-                infoName.setText(marker.getTitle());
-                return null;
-            }
-
-            @Override
-            public View getInfoContents(Marker marker) {
-                return null;
-            }
-        });
-*/
-
         initSocket();
         socket.on("newLocationWifi", getPoints);
+        socket.on("deletePointLocationWiFI", deletePoint);
         getContact();
 
     }
@@ -222,18 +211,16 @@ public class TimeActivity extends AppCompatActivity implements OnMapReadyCallbac
                         LatLng latLng = new LatLng(Double.parseDouble(longitude), Double.parseDouble(latitude));
                         final MarkerOptions markerOptions = new MarkerOptions();
                         markerOptions.position(latLng);
-                        markerOptions.title(point.fio+"\n"+point.number);
+                        markerOptions.title(point.fio + "\n" + point.number);
                         markerOptions.snippet(point.path);
-
-
-
-
-
-                        runOnUiThread(() -> {
-                            Marker m = mMap.addMarker(markerOptions);
-                            Log.d("stas", "runOnUiThread");
-                            m.setIcon(BitmapDescriptorFactory.fromResource(R.drawable.map2));
-                        });
+                        if (point.userID != myId) {
+                            pointsList.put(point.userID, point);
+                            runOnUiThread(() -> {
+                                Marker m = mMap.addMarker(markerOptions);
+                                Log.d("stas", "runOnUiThread");
+                                m.setIcon(BitmapDescriptorFactory.fromResource(R.drawable.map2));
+                            });
+                        }
 
                     } catch (JSONException e) {
                         Log.d("VOMER_DATA", " GetContactAndroid  JSONException = " + e.getMessage());
@@ -247,37 +234,61 @@ public class TimeActivity extends AppCompatActivity implements OnMapReadyCallbac
         });
     }
 
-            private Emitter.Listener getPoints = args -> runOnUiThread(() -> {
-                String a = args[0].toString();
-                GsonBuilder builder = new GsonBuilder();
-                Gson gson = builder.create();
-                Point point = gson.fromJson(a, Point.class);
-                int id = point.userID;
-                if (id != myId) {
-                    String longitude = point.longitude;
-                    String latitude = point.latitude;
-                    Log.d("stas", longitude + " " + latitude);
-                    LatLng latLng = new LatLng(Double.parseDouble(longitude), Double.parseDouble(latitude));
-                    final MarkerOptions markerOptions = new MarkerOptions();
-                    markerOptions.position(latLng);
-                    markerOptions.title(point.fio + "\n" + point.number);
-                    markerOptions.snippet(point.path);
-                    Marker m = mMap.addMarker(markerOptions);
-                    m.setIcon(BitmapDescriptorFactory.fromResource(R.drawable.map2));
-                }
+    private Emitter.Listener getPoints = args -> runOnUiThread(() -> {
+        String a = args[0].toString();
+        GsonBuilder builder = new GsonBuilder();
+        Gson gson = builder.create();
+        Point point = gson.fromJson(a, Point.class);
+        int id = point.userID;
+        if (id != myId) {
+            String longitude = point.longitude;
+            String latitude = point.latitude;
+            Log.d("stas", longitude + " " + latitude);
+            LatLng latLng = new LatLng(Double.parseDouble(longitude), Double.parseDouble(latitude));
+            final MarkerOptions markerOptions = new MarkerOptions();
+            markerOptions.position(latLng);
+            markerOptions.title(point.fio + "\n" + point.number);
+            markerOptions.snippet(point.path);
+            pointsList.put(point.userID, point);
+            Marker m = mMap.addMarker(markerOptions);
+            m.setIcon(BitmapDescriptorFactory.fromResource(R.drawable.map2));
+        }
 
-            });
-
-
-
+    });
 
 
+    private Emitter.Listener deletePoint = args -> runOnUiThread(() -> {
+        String a = args[0].toString();
+        try {
+            JSONObject object = new JSONObject(a);
+            int userId = object.getInt("userID");
+            pointsList.remove(userId);
+            mMap.clear();
+            for(int i = 0; i < pointsList.size(); i++){
+               Point p = pointsList.get(i);
+                LatLng latLng = new LatLng(Double.parseDouble(p.longitude), Double.parseDouble(p.latitude));
+                final MarkerOptions markerOptions = new MarkerOptions();
+                markerOptions.position(latLng);
+                markerOptions.title(p.fio + "\n" + p.number);
+                markerOptions.snippet(p.path);
+                Marker m = mMap.addMarker(markerOptions);
+                m.setIcon(BitmapDescriptorFactory.fromResource(R.drawable.map2));
+            }
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+
+    });
 
 
-
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        socket.emit("deletePointLocationWiFI", myId);
+        socket.disconnect();
+    }
 
     private void setMap(Bundle savedInstanceState) {
-
         mapView = (MapView) findViewById(R.id.map_view);
         mapView.onCreate(savedInstanceState);
         mapView.getMapAsync(googleMap -> {
@@ -287,17 +298,16 @@ public class TimeActivity extends AppCompatActivity implements OnMapReadyCallbac
             mMap.setInfoWindowAdapter(new GoogleMap.InfoWindowAdapter() {
                 @Override
                 public View getInfoWindow(Marker marker) {
-                   return null;
+                    return null;
                 }
 
                 @Override
                 public View getInfoContents(Marker marker) {
                     infoName.setText(marker.getTitle());
-                    Picasso.with(infoWindow.getContext()).load("https://vomer.com.ua/uploads/min_"+marker.getSnippet()).into(photo);
+                    Picasso.with(infoWindow.getContext()).load("https://vomer.com.ua/uploads/min_" + marker.getSnippet()).into(photo);
                     return infoWindow;
                 }
             });
-
 
 
             mapView.onResume();
@@ -321,29 +331,29 @@ public class TimeActivity extends AppCompatActivity implements OnMapReadyCallbac
 
                 if (moveCamera) {
 
-                    socket.emit("newLocationWifi",location.getLatitude(), location.getLongitude() , (Ack) args -> {
-                                JSONObject data = null;
-                                try {
-                                    data = new JSONObject(args[0].toString());
-                                } catch (JSONException e) {
-                                    Log.d("VOMER_DATA", " syncLogin  JSONException = " + e.getMessage());
+                    socket.emit("newLocationWifi", location.getLatitude(), location.getLongitude(), (Ack) args -> {
+                        JSONObject data = null;
+                        try {
+                            data = new JSONObject(args[0].toString());
+                        } catch (JSONException e) {
+                            Log.d("VOMER_DATA", " syncLogin  JSONException = " + e.getMessage());
+                        }
+                        if (data != null) {
+                            try {
+                                Log.d("VOMER_DATA", "syncLogin" + data);
+                                String result = data.getString("result");
+
+                                if (result.equals("done")) {
+                                    Log.d("stas", "done");
+
                                 }
-                                if (data != null) {
-                                    try {
-                                        Log.d("VOMER_DATA", "syncLogin" + data);
-                                        String result = data.getString("result");
 
-                                        if (result.equals("done")) {
-                                            Log.d("stas", "done");
+                            } catch (JSONException e) {
+                                Log.d("VOMER_DATA", " syncLogin  JSONException = " + e.getMessage());
 
-                                        }
-
-                                    } catch (JSONException e) {
-                                        Log.d("VOMER_DATA", " syncLogin  JSONException = " + e.getMessage());
-
-                                    }
-                                }
-                            });
+                            }
+                        }
+                    });
 
 
                     CameraUpdate center = CameraUpdateFactory.newLatLng(new LatLng(location.getLatitude(), location.getLongitude()));
@@ -621,11 +631,9 @@ public class TimeActivity extends AppCompatActivity implements OnMapReadyCallbac
             public void call(Object... args) {
 
 
-                    }
-                });
+            }
+        });
 
 
-
-
-}
+    }
 }
