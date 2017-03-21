@@ -77,6 +77,7 @@ public class TimeActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     // Message type for the handler
     private final static int MSG_UPDATE_TIME = 0;
+    private final static int REMOVE_UPDATE = 1;
     List<Day> dayList = new ArrayList<>();
     boolean fabPressed = false;
 
@@ -88,6 +89,7 @@ public class TimeActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     boolean moveCamera = true;
 
+
     //http://stackoverflow.com/questions/14826345/android-maps-api-v2-change-mylocation-icon
 
     @Override
@@ -97,19 +99,21 @@ public class TimeActivity extends AppCompatActivity implements OnMapReadyCallbac
         dbMethods = new DBMethods(this);
         fab = (FloatingActionButton) findViewById(R.id.fab);
         timer = (TextView) findViewById(R.id.timer);
-
+        WifiManager wifiManager = (WifiManager) getSystemService(Context.WIFI_SERVICE);
 
         fab.setOnClickListener(v -> {
             if (!fabPressed) {
 
+                Log.d("stas", "serviceBound = " + serviceBound + "isTimerRunning = " + timeService.isTimerRunning());
+
                 if (isMobileConnected(TimeActivity.this)) {//если есть интернет то запускаем таймер и вайфай раздачу
 
-                    onWifiHotspot()
+               /*     onWifiHotspot()
                             .subscribeOn(Schedulers.io())
                             .observeOn(AndroidSchedulers.mainThread())
-                            .subscribe();
-
+                            .subscribe();*/
                     if (serviceBound && !timeService.isTimerRunning()) {
+                        wifiManager.setWifiEnabled(false);
                         Log.d("stas", "Starting timer");
                         timeService.startTimer();
                         mUpdateTimeHandler.sendEmptyMessage(MSG_UPDATE_TIME);
@@ -138,21 +142,15 @@ public class TimeActivity extends AppCompatActivity implements OnMapReadyCallbac
         });
 
 
-
         setAdapter();
         setDaysOnline();
         setMap(savedInstanceState);
+
+
     }
 
 
-
-
-
-
-
-
-
-    private void setMap(Bundle savedInstanceState){
+    private void setMap(Bundle savedInstanceState) {
 
         mapView = (MapView) findViewById(R.id.map_view);
         mapView.onCreate(savedInstanceState);
@@ -168,22 +166,17 @@ public class TimeActivity extends AppCompatActivity implements OnMapReadyCallbac
                     mMap.setMyLocationEnabled(true);
 
                 }
-            }
-            else {
+            } else {
                 buildGoogleApiClient();
                 mMap.setMyLocationEnabled(true);
 
 
-
-
             }
-
-
 
 
             mMap.setOnMyLocationChangeListener(location -> {
 
-                if(moveCamera) {
+                if (moveCamera) {
 
                     CameraUpdate center = CameraUpdateFactory.newLatLng(new LatLng(location.getLatitude(), location.getLongitude()));
                     CameraUpdate zoom = CameraUpdateFactory.zoomTo(11);
@@ -204,17 +197,14 @@ public class TimeActivity extends AppCompatActivity implements OnMapReadyCallbac
 */
 
 
-
-
             });
         });
-
 
 
     }
 
 
-    private void drawMarkerWithCircle(LatLng position){
+    private void drawMarkerWithCircle(LatLng position) {
         double radiusInMeters = 100.0;
         int strokeColor = 0xffff0000; //red outline
         int shadeColor = 0x44ff0000; //opaque red fill
@@ -225,6 +215,7 @@ public class TimeActivity extends AppCompatActivity implements OnMapReadyCallbac
         MarkerOptions markerOptions = new MarkerOptions().position(position);
         mMarker = mMap.addMarker(markerOptions);
     }
+
     private void updateMarkerWithCircle(LatLng position) {
         mCircle.setCenter(position);
         mMarker.setPosition(position);
@@ -238,9 +229,6 @@ public class TimeActivity extends AppCompatActivity implements OnMapReadyCallbac
                 .build();
         mGoogleApiClient.connect();
     }
-
-
-
 
 
     private Observable<Void> onWifiHotspot() {
@@ -262,7 +250,9 @@ public class TimeActivity extends AppCompatActivity implements OnMapReadyCallbac
                 boolean apstatus = (Boolean) setWifiApMethod.invoke(wifiManager, netConfig, true);
 
                 Method isWifiApEnabledmethod = wifiManager.getClass().getMethod("isWifiApEnabled");
-                while (!(Boolean) isWifiApEnabledmethod.invoke(wifiManager)) {};
+                while (!(Boolean) isWifiApEnabledmethod.invoke(wifiManager)) {
+                }
+                ;
                 Method getWifiApStateMethod = wifiManager.getClass().getMethod("getWifiApState");
                 int apstate = (Integer) getWifiApStateMethod.invoke(wifiManager);
                 Method getWifiApConfigurationMethod = wifiManager.getClass().getMethod("getWifiApConfiguration");
@@ -277,6 +267,7 @@ public class TimeActivity extends AppCompatActivity implements OnMapReadyCallbac
 
             apControl.enable();
         });
+
 
     }
 
@@ -380,11 +371,20 @@ public class TimeActivity extends AppCompatActivity implements OnMapReadyCallbac
         }
     };
 
+
     private void updateUITimer() {
         if (serviceBound) {
             if (timeService.getTime() == null) {
+
                 Log.d("stas", "internet = false");
-                mUpdateTimeHandler.removeMessages(MSG_UPDATE_TIME);
+
+
+                mUpdateTimeHandler.sendEmptyMessage(REMOVE_UPDATE);
+                // mUpdateTimeHandler.removeCallbacksAndMessages(null);
+                fab.setColorNormal(Color.parseColor("#FF5722"));
+                fab.setColorPressed(Color.parseColor("#FF7043"));
+                fabPressed = false;
+
             } else
 
                 timer.setText(timeService.getTime());
@@ -429,9 +429,15 @@ public class TimeActivity extends AppCompatActivity implements OnMapReadyCallbac
 
         @Override
         public void handleMessage(Message message) {
-            if (MSG_UPDATE_TIME == message.what) {
-                activity.get().updateUITimer();
-                sendEmptyMessageDelayed(MSG_UPDATE_TIME, UPDATE_RATE_MS);
+            switch (message.what) {
+                case MSG_UPDATE_TIME:
+                    activity.get().updateUITimer();
+                    sendEmptyMessageDelayed(MSG_UPDATE_TIME, UPDATE_RATE_MS);
+                    break;
+                case REMOVE_UPDATE:
+                    this.removeMessages(0);
+                    break;
+
             }
         }
     }
