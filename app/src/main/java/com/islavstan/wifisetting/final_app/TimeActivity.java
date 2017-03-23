@@ -2,24 +2,24 @@ package com.islavstan.wifisetting.final_app;
 
 import android.Manifest;
 import android.content.ComponentName;
-import android.content.ContentValues;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.ServiceConnection;
 
 import android.content.pm.PackageManager;
-import android.database.sqlite.SQLiteDatabase;
 import android.graphics.Color;
 import android.location.Location;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
+import android.net.Uri;
 import android.net.wifi.WifiConfiguration;
 import android.net.wifi.WifiManager;
 import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
+import android.provider.Settings;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v4.content.ContextCompat;
@@ -32,8 +32,8 @@ import android.support.v7.widget.RecyclerView;
 import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Button;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.github.clans.fab.FloatingActionButton;
 import com.google.android.gms.maps.CameraUpdate;
@@ -116,6 +116,7 @@ public class TimeActivity extends AppCompatActivity implements OnMapReadyCallbac
     int myId = 344;
     Map<Integer, Point> pointsList = new HashMap<>();
 
+    private static final int REQUEST_WRITE_SETTINGS = 1;
     //http://stackoverflow.com/questions/14826345/android-maps-api-v2-change-mylocation-icon
 
     @Override
@@ -127,44 +128,54 @@ public class TimeActivity extends AppCompatActivity implements OnMapReadyCallbac
         timer = (TextView) findViewById(R.id.timer);
         WifiManager wifiManager = (WifiManager) getSystemService(Context.WIFI_SERVICE);
         socket = new MySocket(this).GetSocket();
+
+
         fab.setOnClickListener(v -> {
-            if (!fabPressed) {
 
-                Log.d("stas", "serviceBound = " + serviceBound + "isTimerRunning = " + timeService.isTimerRunning());
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.System.canWrite(this)) {
+                new AlertDialog.Builder(this)
+                        .setMessage("Разрешить чтение и запись настроек системы? Необходимо для работы точки доступа")
+                        .setPositiveButton("OK", (dialog, which) -> {
+                            Intent intent = new Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS);
+                            intent.setData(Uri.parse("package:" + getPackageName()));
+                            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 
-                if (isMobileConnected(TimeActivity.this)) {//если есть интернет то запускаем таймер и вайфай раздачу
-
-               /*     onWifiHotspot()
-                            .subscribeOn(Schedulers.io())
-                            .observeOn(AndroidSchedulers.mainThread())
-                            .subscribe();*/
-                    if (serviceBound && !timeService.isTimerRunning()) {
-                        wifiManager.setWifiEnabled(false);
-                        Log.d("stas", "Starting timer");
-                        timeService.startTimer();
-                        mUpdateTimeHandler.sendEmptyMessage(MSG_UPDATE_TIME);
-                        fabPressed = true;
-                        fab.setColorNormal(Color.parseColor("#4CAF50"));
-                        fab.setColorPressed(Color.parseColor("#43A047"));
-                    }
-
-
-                } else showNo3gpDialog();
-
+                            startActivityForResult(intent, REQUEST_WRITE_SETTINGS);
+                        }).show();
             } else {
-                if (serviceBound && timeService.isTimerRunning()) {
-                    Log.d("stas", "Stopping timer");
-                    timeService.stopTimer();
-                    mUpdateTimeHandler.removeMessages(MSG_UPDATE_TIME);
-                    fabPressed = false;
-                    fab.setColorNormal(Color.parseColor("#FF5722"));
-                    fab.setColorPressed(Color.parseColor("#FF7043"));
+
+
+                if (!fabPressed) {
+
+                    Log.d("stas", "serviceBound = " + serviceBound + "isTimerRunning = " + timeService.isTimerRunning());
+
+                    if (getMobileInternet()) {//если есть интернет то запускаем таймер и вайфай раздачу
+
+                        if (serviceBound && !timeService.isTimerRunning()) {
+                            wifiManager.setWifiEnabled(false);
+                            Log.d("stas", "Starting timer");
+                            timeService.startTimer();
+                            mUpdateTimeHandler.sendEmptyMessage(MSG_UPDATE_TIME);
+                            fabEnable();
+                        }
+
+
+                    } else showNo3gpDialog();
+
+
+                } else {
+                    if (serviceBound && timeService.isTimerRunning()) {
+                        Log.d("stas", "Stopping timer");
+                        timeService.stopTimer();
+                        mUpdateTimeHandler.removeMessages(MSG_UPDATE_TIME);
+                        fabDisable();
+
+                    }
 
                 }
 
+
             }
-
-
         });
 
         this.infoWindow = (ViewGroup) getLayoutInflater().inflate(R.layout.info_window, null);
@@ -180,12 +191,32 @@ public class TimeActivity extends AppCompatActivity implements OnMapReadyCallbac
         initSocket();
         socket.on("newLocationWifi", getPoints);
         socket.on("deletePointLocationWiFI", deletePoint);
-        getContact();
+        getAllLocationWifi();
 
     }
 
 
-    public void getContact() {
+    private boolean getMobileInternet() {
+        ConnectivityManager cm = (ConnectivityManager) this.getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo activeNetwork = cm.getActiveNetworkInfo();
+        if (activeNetwork != null && activeNetwork.getType() == ConnectivityManager.TYPE_MOBILE) {
+            return true;
+        } else
+            return false;
+
+
+    }
+
+
+    private void initSocket() {
+
+
+        socket.emit("Vomer syncLogin", myId, 4620700, 8229, 2, (Ack) args -> {
+        });
+
+    }
+
+    public void getAllLocationWifi() {
 
         socket.emit("getAllLocationWifi", myId, (Ack) args -> {
             Log.d("VOMER_DATA", "GetContactAndroid" + args[0].toString());
@@ -217,7 +248,6 @@ public class TimeActivity extends AppCompatActivity implements OnMapReadyCallbac
                             pointsList.put(point.userID, point);
                             runOnUiThread(() -> {
                                 Marker m = mMap.addMarker(markerOptions);
-                                Log.d("stas", "runOnUiThread");
                                 m.setIcon(BitmapDescriptorFactory.fromResource(R.drawable.map2));
                             });
                         }
@@ -264,8 +294,8 @@ public class TimeActivity extends AppCompatActivity implements OnMapReadyCallbac
             int userId = object.getInt("userID");
             pointsList.remove(userId);
             mMap.clear();
-            for(int i = 0; i < pointsList.size(); i++){
-               Point p = pointsList.get(i);
+            for (int i = 0; i < pointsList.size(); i++) {
+                Point p = pointsList.get(i);
                 LatLng latLng = new LatLng(Double.parseDouble(p.longitude), Double.parseDouble(p.latitude));
                 final MarkerOptions markerOptions = new MarkerOptions();
                 markerOptions.position(latLng);
@@ -280,13 +310,6 @@ public class TimeActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     });
 
-
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
-        socket.emit("deletePointLocationWiFI", myId);
-        socket.disconnect();
-    }
 
     private void setMap(Bundle savedInstanceState) {
         mapView = (MapView) findViewById(R.id.map_view);
@@ -412,47 +435,6 @@ public class TimeActivity extends AppCompatActivity implements OnMapReadyCallbac
     }
 
 
-    private Observable<Void> onWifiHotspot() {
-        return Observable.create(subscriber -> {
-
-
-            WifiManager wifiManager = (WifiManager) getSystemService(Context.WIFI_SERVICE);
-            if (wifiManager.isWifiEnabled()) {
-                wifiManager.setWifiEnabled(false);
-            }
-            WifiConfiguration netConfig = new WifiConfiguration();
-            netConfig.SSID = "VOMER";
-            netConfig.allowedAuthAlgorithms.set(WifiConfiguration.AuthAlgorithm.OPEN);
-            netConfig.allowedProtocols.set(WifiConfiguration.Protocol.RSN);
-            netConfig.allowedProtocols.set(WifiConfiguration.Protocol.WPA);
-            netConfig.allowedKeyManagement.set(WifiConfiguration.KeyMgmt.NONE);
-            try {
-                Method setWifiApMethod = wifiManager.getClass().getMethod("setWifiApEnabled", WifiConfiguration.class, boolean.class);
-                boolean apstatus = (Boolean) setWifiApMethod.invoke(wifiManager, netConfig, true);
-
-                Method isWifiApEnabledmethod = wifiManager.getClass().getMethod("isWifiApEnabled");
-                while (!(Boolean) isWifiApEnabledmethod.invoke(wifiManager)) {
-                }
-                ;
-                Method getWifiApStateMethod = wifiManager.getClass().getMethod("getWifiApState");
-                int apstate = (Integer) getWifiApStateMethod.invoke(wifiManager);
-                Method getWifiApConfigurationMethod = wifiManager.getClass().getMethod("getWifiApConfiguration");
-                netConfig = (WifiConfiguration) getWifiApConfigurationMethod.invoke(wifiManager);
-                Log.d("stas", "\nSSID:" + netConfig.SSID + "\nPassword:" + netConfig.preSharedKey + "\n");
-
-            } catch (Exception e) {
-                Log.e(this.getClass().toString(), "", e);
-            }
-
-            WifiApControl apControl = WifiApControl.getInstance(this);
-
-            apControl.enable();
-        });
-
-
-    }
-
-
     private void setAdapter() {
         dbMethods.getDaysList()
                 .subscribeOn(Schedulers.io())
@@ -483,7 +465,7 @@ public class TimeActivity extends AppCompatActivity implements OnMapReadyCallbac
     private void showNo3gpDialog() {
         AlertDialog.Builder builder = new AlertDialog.Builder(TimeActivity.this);
         builder.setTitle("Важно!")
-                .setMessage("Для работы сервиса включите мобильный интернет!")
+                .setMessage("Для работы сервиса отключите Wi-Fi и включите мобильный интернет!")
                 .setCancelable(true)
                 .setNegativeButton("ОК",
                         (dialog, id) -> dialog.cancel());
@@ -491,14 +473,6 @@ public class TimeActivity extends AppCompatActivity implements OnMapReadyCallbac
         alert.show();
 
 
-    }
-
-
-    public boolean isMobileConnected(Context context) {
-        ConnectivityManager connManager = (ConnectivityManager) context
-                .getSystemService(Context.CONNECTIVITY_SERVICE);
-        NetworkInfo netInfo = connManager.getNetworkInfo(ConnectivityManager.TYPE_MOBILE);
-        return ((netInfo != null) && netInfo.isConnected());
     }
 
 
@@ -540,6 +514,7 @@ public class TimeActivity extends AppCompatActivity implements OnMapReadyCallbac
             timeService.background();
             if (timeService.isTimerRunning()) {
                 mUpdateTimeHandler.sendEmptyMessage(MSG_UPDATE_TIME);
+                fabEnable();
                 Log.d("stas", "sendEmptyMessage from ServiceConnection");
             }
 
@@ -556,15 +531,8 @@ public class TimeActivity extends AppCompatActivity implements OnMapReadyCallbac
     private void updateUITimer() {
         if (serviceBound) {
             if (timeService.getTime() == null) {
-
-                Log.d("stas", "internet = false");
-
-
                 mUpdateTimeHandler.sendEmptyMessage(REMOVE_UPDATE);
-                // mUpdateTimeHandler.removeCallbacksAndMessages(null);
-                fab.setColorNormal(Color.parseColor("#FF5722"));
-                fab.setColorPressed(Color.parseColor("#FF7043"));
-                fabPressed = false;
+                fabDisable();
 
             } else
 
@@ -572,29 +540,16 @@ public class TimeActivity extends AppCompatActivity implements OnMapReadyCallbac
         }
     }
 
-    @Override
-    public void onConnected(@Nullable Bundle bundle) {
-
+    private void fabEnable() {
+        fabPressed = true;
+        fab.setColorNormal(Color.parseColor("#4CAF50"));
+        fab.setColorPressed(Color.parseColor("#43A047"));
     }
 
-    @Override
-    public void onConnectionSuspended(int i) {
-
-    }
-
-    @Override
-    public void onConnectionFailed(@NonNull ConnectionResult connectionResult) {
-
-    }
-
-    @Override
-    public void onLocationChanged(Location location) {
-
-    }
-
-    @Override
-    public void onMapReady(GoogleMap googleMap) {
-
+    private void fabDisable() {
+        fab.setColorNormal(Color.parseColor("#FF5722"));
+        fab.setColorPressed(Color.parseColor("#FF7043"));
+        fabPressed = false;
     }
 
 
@@ -623,17 +578,105 @@ public class TimeActivity extends AppCompatActivity implements OnMapReadyCallbac
         }
     }
 
-    private void initSocket() {
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        socket.emit("deletePointLocationWiFI", myId);
+        socket.disconnect();
+    }
 
 
-        socket.emit("Vomer syncLogin", myId, 4620700, 8229, 2, new Ack() {
-            @Override
-            public void call(Object... args) {
+    private Observable<Void> onWifiHotspot() {
+        return Observable.create(subscriber -> {
 
 
+            WifiManager wifiManager = (WifiManager) getSystemService(Context.WIFI_SERVICE);
+            if (wifiManager.isWifiEnabled()) {
+                wifiManager.setWifiEnabled(false);
             }
+            WifiConfiguration netConfig = new WifiConfiguration();
+            netConfig.SSID = "VOMER";
+            netConfig.allowedAuthAlgorithms.set(WifiConfiguration.AuthAlgorithm.OPEN);
+            netConfig.allowedProtocols.set(WifiConfiguration.Protocol.RSN);
+            netConfig.allowedProtocols.set(WifiConfiguration.Protocol.WPA);
+            netConfig.allowedKeyManagement.set(WifiConfiguration.KeyMgmt.NONE);
+            try {
+                Method setWifiApMethod = wifiManager.getClass().getMethod("setWifiApEnabled", WifiConfiguration.class, boolean.class);
+                boolean apstatus = (Boolean) setWifiApMethod.invoke(wifiManager, netConfig, true);
+
+                Method isWifiApEnabledmethod = wifiManager.getClass().getMethod("isWifiApEnabled");
+                while (!(Boolean) isWifiApEnabledmethod.invoke(wifiManager)) {
+                }
+                ;
+                Method getWifiApStateMethod = wifiManager.getClass().getMethod("getWifiApState");
+                int apstate = (Integer) getWifiApStateMethod.invoke(wifiManager);
+                Method getWifiApConfigurationMethod = wifiManager.getClass().getMethod("getWifiApConfiguration");
+                netConfig = (WifiConfiguration) getWifiApConfigurationMethod.invoke(wifiManager);
+                Log.d("stas", "\nSSID:" + netConfig.SSID + "\nPassword:" + netConfig.preSharedKey + "\n");
+
+            } catch (Exception e) {
+                Log.e(this.getClass().toString(), "", e);
+            }
+
+            WifiApControl apControl = WifiApControl.getInstance(this);
+
+            apControl.enable();
         });
 
 
     }
+
+
+    @Override
+    public void onConnected(@Nullable Bundle bundle) {
+
+    }
+
+    @Override
+    public void onConnectionSuspended(int i) {
+
+    }
+
+    @Override
+    public void onConnectionFailed(@NonNull ConnectionResult connectionResult) {
+
+    }
+
+    @Override
+    public void onLocationChanged(Location location) {
+
+    }
+
+    @Override
+    public void onMapReady(GoogleMap googleMap) {
+
+    }
+
+
+    private void getActiveNetworkInfo() {
+        ConnectivityManager cm = (ConnectivityManager) this.getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo activeNetwork = cm.getActiveNetworkInfo();
+        if (activeNetwork != null) { // connected to the internet
+            if (activeNetwork.getType() == ConnectivityManager.TYPE_WIFI) {
+                // connected to wifi
+                Toast.makeText(this, activeNetwork.getTypeName(), Toast.LENGTH_SHORT).show();
+            } else if (activeNetwork.getType() == ConnectivityManager.TYPE_MOBILE) {
+                // connected to the mobile provider's data plan
+                Toast.makeText(this, activeNetwork.getTypeName(), Toast.LENGTH_SHORT).show();
+            }
+        } else {
+            Toast.makeText(this, "NONE", Toast.LENGTH_SHORT).show();
+        }
+
+
+    }
+
+    public boolean isMobileConnected(Context context) {
+        ConnectivityManager connManager = (ConnectivityManager) context
+                .getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo netInfo = connManager.getNetworkInfo(ConnectivityManager.TYPE_MOBILE);
+        return ((netInfo != null) && netInfo.isConnected());
+    }
+
+
 }

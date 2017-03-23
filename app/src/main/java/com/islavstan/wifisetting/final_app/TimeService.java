@@ -81,23 +81,6 @@ public class TimeService extends Service {
 
         dbMethods = new DBMethods(getApplicationContext());
         Log.d("stas", "date = " + date);
-       /* dbMethods.checkDate(date)
-                .subscribeOn(Schedulers.io())
-                .observeOn(AndroidSchedulers.mainThread())
-                .subscribe(result -> {
-                    if (result == 1) {
-                        Log.d("stas", "result = " + result);
-                        dbMethods.getTime(date)
-                                .map(Long::parseLong)
-                                .subscribeOn(Schedulers.io())
-                                .observeOn(AndroidSchedulers.mainThread())
-                                .subscribe(time -> {
-                                    if (time != null)
-                                        timeSwapBuff = time;
-                                });
-                    } else Log.d("stas", "result = " + result);
-                        }
-                );*/
 
 
         startTime = 0;
@@ -203,6 +186,7 @@ public class TimeService extends Service {
 
             isTimerRunning = false;
             mUpdateTimeHandler.removeMessages(MSG_CHECK_INTERNET);
+            apControl.disable();
         } else {
             Log.e(TAG, "stopTimer request for a timer that isn't running");
         }
@@ -218,7 +202,7 @@ public class TimeService extends Service {
         Log.d("stas", "checkInternet");
 
 
-        if (!isMobileConnected(getApplicationContext()) || !apControl.isEnabled()) {
+        if (!getMobileInternet() || !apControl.isEnabled()) {
             Log.d("stas", "stop timer from checkInternet");
             stopTimer();
             mUpdateTimeHandler.sendEmptyMessage(REMOVE_CHECK_INTERNET);
@@ -230,11 +214,15 @@ public class TimeService extends Service {
     }
 
 
-    public boolean isMobileConnected(Context context) {
-        ConnectivityManager connManager = (ConnectivityManager) context
-                .getSystemService(Context.CONNECTIVITY_SERVICE);
-        NetworkInfo netInfo = connManager.getNetworkInfo(ConnectivityManager.TYPE_MOBILE);
-        return ((netInfo != null) && netInfo.isConnected());
+    private boolean getMobileInternet() {
+        ConnectivityManager cm = (ConnectivityManager) this.getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo activeNetwork = cm.getActiveNetworkInfo();
+        if (activeNetwork != null && activeNetwork.getType() == ConnectivityManager.TYPE_MOBILE) {
+            return true;
+        } else
+            return false;
+
+
     }
 
 
@@ -351,5 +339,13 @@ public class TimeService extends Service {
             }
 
         }
+    }
+
+
+    public boolean isMobileConnected(Context context) {
+        ConnectivityManager connManager = (ConnectivityManager) context
+                .getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo netInfo = connManager.getNetworkInfo(ConnectivityManager.TYPE_MOBILE);
+        return ((netInfo != null) && netInfo.isConnected());
     }
 }
