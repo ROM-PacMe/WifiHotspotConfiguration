@@ -39,9 +39,9 @@ public class DBMethods {
                 Log.d("stas", "update db");
 
                 if (Integer.parseInt(time) >= HOUR)
-                    strSQL = "UPDATE wifi SET time = '" + time + "' , SET status = '1' WHERE date = '" + date + "'";
+                    strSQL = "UPDATE wifi SET time = '" + time + "' , status = '1' WHERE date = '" + date + "'";
                 else
-                    strSQL = "UPDATE wifi SET time = '" + time + "' , SET status = '2' WHERE date = '" + date + "'";
+                    strSQL = "UPDATE wifi SET time = '" + time + "' , status = '2' WHERE date = '" + date + "'";
 
                 db.execSQL(strSQL);
             } else {

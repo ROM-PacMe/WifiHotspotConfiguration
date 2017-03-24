@@ -75,11 +75,13 @@ import com.jjoe64.graphview.series.LineGraphSeries;
 import com.jjoe64.graphview.series.PointsGraphSeries;
 import com.squareup.picasso.Picasso;
 
+import org.jetbrains.annotations.NotNull;
 import org.json.JSONException;
 import org.json.JSONObject;
 
 import cc.mvdan.accesspoint.WifiApControl;
 import de.hdodenhof.circleimageview.CircleImageView;
+import io.ghyeok.stickyswitch.widget.StickySwitch;
 import io.socket.client.Ack;
 import io.socket.client.Socket;
 import io.socket.emitter.Emitter;
@@ -91,7 +93,6 @@ public class TimeActivity extends AppCompatActivity implements OnMapReadyCallbac
         GoogleApiClient.ConnectionCallbacks,
         GoogleApiClient.OnConnectionFailedListener,
         LocationListener {
-    FloatingActionButton fab;
     TextView timer;
     private boolean serviceBound;
     private TimeService timeService;
@@ -124,88 +125,71 @@ public class TimeActivity extends AppCompatActivity implements OnMapReadyCallbac
     Map<Integer, Point> pointsList = new HashMap<>();
 
     private static final int REQUEST_WRITE_SETTINGS = 1;
+    private static final int REQUEST_LOCATION = 2;
 
-    ImageButton toggle;
-    boolean graphic = false;
     RecyclerView graphRecycler;
     GraphicAdapter graphicAdapter;
     List<GraphicModel>graphicModelList = new ArrayList<>();
-
+    StickySwitch stickySwitch;
+    WifiManager wifiManager;
     //http://stackoverflow.com/questions/14826345/android-maps-api-v2-change-mylocation-icon
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        dbMethods = new DBMethods(this);
-        fab = (FloatingActionButton) findViewById(R.id.fab);
-        timer = (TextView) findViewById(R.id.timer);
-        WifiManager wifiManager = (WifiManager) getSystemService(Context.WIFI_SERVICE);
-        socket = new MySocket(this).GetSocket();
-
-  toggle = (ImageButton)findViewById(R.id.toggle);
 
 
-
-
-        toggle.setOnClickListener(v -> {
-            if(!graphic){
-                mapView.setVisibility(View.INVISIBLE);
-                graphRecycler.setVisibility(View.VISIBLE);
-                graphic = true;
-            }else{
-                mapView.setVisibility(View.VISIBLE);
-                graphRecycler.setVisibility(View.INVISIBLE);
-                graphic = false;
-            }
-        });
-
-
-
-
-
-
-        fab.setOnClickListener(v -> {
-
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.System.canWrite(this)) {
-                 showPermissionDialog();
-
-
-            } else {
-
-
-                if (!fabPressed) {
-
-                    Log.d("stas", "serviceBound = " + serviceBound + "isTimerRunning = " + timeService.isTimerRunning());
-
-                    if (getMobileInternet()) {//если есть интернет то запускаем таймер и вайфай раздачу
-
-                        if (serviceBound && !timeService.isTimerRunning()) {
-                            wifiManager.setWifiEnabled(false);
-                            Log.d("stas", "Starting timer");
-                            timeService.startTimer();
-                            mUpdateTimeHandler.sendEmptyMessage(MSG_UPDATE_TIME);
-                            fabEnable();
-                        }
-
-
-                    } else showNo3gpDialog();
-
-
+        stickySwitch = (StickySwitch) findViewById(R.id.fab2);
+        stickySwitch.setOnSelectedChangeListener((direction, s) -> {
+            if (direction.equals(StickySwitch.Direction.RIGHT)) {
+                //on
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.System.canWrite(this)) {
+                    showPermissionDialog();
+                    stickySwitch.setDirection(StickySwitch.Direction.LEFT);
                 } else {
-                    if (serviceBound && timeService.isTimerRunning()) {
-                        Log.d("stas", "Stopping timer");
-                        timeService.stopTimer();
-                        mUpdateTimeHandler.removeMessages(MSG_UPDATE_TIME);
-                        fabDisable();
+
+                    if (!fabPressed) {
+
+                        if (getMobileInternet()) {//если есть интернет то запускаем таймер и вайфай раздачу
+
+                            if (serviceBound && !timeService.isTimerRunning()) {
+                                wifiManager.setWifiEnabled(false);
+                                Log.d("stas", "Starting timer");
+                                timeService.startTimer();
+                                mUpdateTimeHandler.sendEmptyMessage(MSG_UPDATE_TIME);
+                                fabPressed = true;
+                            }
+
+
+                        } else {
+                            showNo3gpDialog();
+                            stickySwitch.setDirection(StickySwitch.Direction.LEFT);
+                        }
 
                     }
 
                 }
+            } else {
+                //off
+                if (serviceBound && timeService.isTimerRunning()) {
+                    Log.d("stas", "Stopping timer");
+                    timeService.stopTimer();
+                    mUpdateTimeHandler.removeMessages(MSG_UPDATE_TIME);
+                    fabPressed = false;
 
+
+                }
 
             }
         });
+
+        getLocationPermission();
+        dbMethods = new DBMethods(this);
+        timer = (TextView) findViewById(R.id.timer);
+        wifiManager = (WifiManager) getSystemService(Context.WIFI_SERVICE);
+        socket = new MySocket(this).GetSocket();
+
 
         this.infoWindow = (ViewGroup) getLayoutInflater().inflate(R.layout.info_window, null);
         this.infoName = (TextView) infoWindow.findViewById(R.id.name);
@@ -224,17 +208,33 @@ public class TimeActivity extends AppCompatActivity implements OnMapReadyCallbac
         getAllLocationWifi();
 
 
-
-       /* dbMethods.writeTimeToDB("25-марта-2017", "3600020")
-                .subscribeOn(Schedulers.io())
-                .observeOn(AndroidSchedulers.mainThread())
-                .subscribe();
-        dbMethods.writeTimeToDB("26-марта-2017", "3600020")
-                .subscribeOn(Schedulers.io())
-                .observeOn(AndroidSchedulers.mainThread())
-                .subscribe();
-     */
     }
+
+
+
+
+
+
+
+
+
+
+    private void getLocationPermission(){
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            int hasLocationPermission = checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION);
+
+            List<String> permissions = new ArrayList<>();
+            if (hasLocationPermission != PackageManager.PERMISSION_GRANTED) {
+                permissions.add(Manifest.permission.ACCESS_FINE_LOCATION);
+            }
+            if (!permissions.isEmpty()) {
+                requestPermissions(permissions.toArray(new String[permissions.size()]), REQUEST_LOCATION);
+            }
+        }
+
+    }
+
+
 
     private void setGraphic() {
         graphRecycler = (RecyclerView) findViewById(R.id.graph_recycler);
@@ -244,19 +244,13 @@ public class TimeActivity extends AppCompatActivity implements OnMapReadyCallbac
         graphRecycler.setItemAnimator(new DefaultItemAnimator());
         graphRecycler.setAdapter(graphicAdapter);
 
-
         dbMethods.getGraphicList()
                 .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(list -> {
                             graphicModelList.addAll(list);
-
-
-
                         }, error -> Log.d("stas", "getGraphicList error = " + error.getMessage())
                 );
-
-
     }
 
 
@@ -278,14 +272,7 @@ public class TimeActivity extends AppCompatActivity implements OnMapReadyCallbac
                 }).show();
     }
 
-    public void checkPermission() {
-        boolean hasPermission = (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED);
-        if (!hasPermission) {
-            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, REQUEST_WRITE_SETTINGS);
 
-        }
-
-    }
 
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
@@ -649,13 +636,12 @@ public class TimeActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     private void fabEnable() {
         fabPressed = true;
-        fab.setColorNormal(Color.parseColor("#4CAF50"));
-        fab.setColorPressed(Color.parseColor("#43A047"));
+        stickySwitch.setDirection(StickySwitch.Direction.RIGHT);
+
     }
 
     private void fabDisable() {
-        fab.setColorNormal(Color.parseColor("#FF5722"));
-        fab.setColorPressed(Color.parseColor("#FF7043"));
+        stickySwitch.setDirection(StickySwitch.Direction.LEFT);
         fabPressed = false;
     }
 
@@ -783,6 +769,15 @@ public class TimeActivity extends AppCompatActivity implements OnMapReadyCallbac
                 .getSystemService(Context.CONNECTIVITY_SERVICE);
         NetworkInfo netInfo = connManager.getNetworkInfo(ConnectivityManager.TYPE_MOBILE);
         return ((netInfo != null) && netInfo.isConnected());
+    }
+
+    public void checkPermission() {
+        boolean hasPermission = (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED);
+        if (!hasPermission) {
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, REQUEST_WRITE_SETTINGS);
+
+        }
+
     }
 
 

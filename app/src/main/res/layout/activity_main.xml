@@ -39,28 +39,36 @@
         android:layout_height="124dp"
         android:layout_below="@+id/map_view">
 
-        <com.github.clans.fab.FloatingActionButton
-            android:id="@+id/fab"
+
+
+        <io.ghyeok.stickyswitch.widget.StickySwitch
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:layout_height="41dp"
             android:layout_centerVertical="true"
+            app:iconPadding="8dp"
+            app:iconSize="21dp"
+            app:switchColor="@color/colorPrimary"
+            app:sliderBackgroundColor="#E0E0E0"
             android:layout_marginLeft="32dp"
             android:layout_marginRight="32dp"
-            android:src="@drawable/wifi_signal"
-            app:fab_colorNormal="#FF5722"
-            app:fab_colorPressed="#FF7043" />
+            android:id="@+id/fab2"
+            app:leftIcon="@drawable/ic_wifi_off"
+            app:rightIcon="@drawable/ic_wifi_signal"
+
+            />
+
 
         <View
             android:layout_width="1dp"
             android:layout_height="match_parent"
-            android:layout_toRightOf="@+id/fab"
+            android:layout_toRightOf="@+id/fab2"
             android:background="#E0E0E0" />
 
         <RelativeLayout
 
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:layout_toRightOf="@+id/fab">
+            android:layout_toRightOf="@+id/fab2">
 
             <ImageButton
                 android:layout_width="wrap_content"
