@@ -39,13 +39,14 @@ public class WifiDaysRecAdapter extends RecyclerView.Adapter<WifiDaysRecAdapter.
 
 
 
-    private String getCorrectTime(long time){
+    private String getCorrectTime(long time) {
         int seconds = (int) (time / 1000);
-        int hours = seconds / 3600;
         int minutes = seconds / 60;
+        int hours = minutes / 60;
+        minutes = minutes % 60;
+
         seconds = seconds % 60;
         return String.format("%02d:%02d", hours, minutes);
-
 
 
     }

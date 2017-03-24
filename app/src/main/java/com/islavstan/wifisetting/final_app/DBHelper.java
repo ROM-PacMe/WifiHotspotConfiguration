@@ -23,10 +23,11 @@ public class DBHelper extends SQLiteOpenHelper {
 
     }
 
-
+//status 1 - выполненный
+    //status 2 - не выполненный
     private void createWifiTable(SQLiteDatabase db) {
         db.execSQL("create table wifi ("
-                + "id integer primary key autoincrement, date text, time text );");
+                + "id integer primary key autoincrement, date text, time text, status integer );");
 
 
     }

@@ -179,6 +179,8 @@ public class TimeService extends Service {
 
             timeSwapBuff += timeInMilliseconds;
 
+            Log.d("stas", "write in db time = "+timeSwapBuff);
+            Log.d("stas", "write in db data = "+date);
             dbMethods.writeTimeToDB(date, String.valueOf(timeSwapBuff))
                     .subscribeOn(Schedulers.io())
                     .observeOn(AndroidSchedulers.mainThread())

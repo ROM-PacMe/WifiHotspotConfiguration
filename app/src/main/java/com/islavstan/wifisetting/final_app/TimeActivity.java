@@ -22,16 +22,19 @@ import android.os.Message;
 import android.provider.Settings;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
+import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.support.v7.widget.DefaultItemAnimator;
+import android.support.v7.widget.GridLayoutManager;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ImageButton;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -66,6 +69,10 @@ import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.MapView;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.islavstan.wifisetting.model.Point;
+import com.jjoe64.graphview.GraphView;
+import com.jjoe64.graphview.series.DataPoint;
+import com.jjoe64.graphview.series.LineGraphSeries;
+import com.jjoe64.graphview.series.PointsGraphSeries;
 import com.squareup.picasso.Picasso;
 
 import org.json.JSONException;
@@ -117,6 +124,13 @@ public class TimeActivity extends AppCompatActivity implements OnMapReadyCallbac
     Map<Integer, Point> pointsList = new HashMap<>();
 
     private static final int REQUEST_WRITE_SETTINGS = 1;
+
+    ImageButton toggle;
+    boolean graphic = false;
+    RecyclerView graphRecycler;
+    GraphicAdapter graphicAdapter;
+    List<GraphicModel>graphicModelList = new ArrayList<>();
+
     //http://stackoverflow.com/questions/14826345/android-maps-api-v2-change-mylocation-icon
 
     @Override
@@ -129,19 +143,34 @@ public class TimeActivity extends AppCompatActivity implements OnMapReadyCallbac
         WifiManager wifiManager = (WifiManager) getSystemService(Context.WIFI_SERVICE);
         socket = new MySocket(this).GetSocket();
 
+  toggle = (ImageButton)findViewById(R.id.toggle);
+
+
+
+
+        toggle.setOnClickListener(v -> {
+            if(!graphic){
+                mapView.setVisibility(View.INVISIBLE);
+                graphRecycler.setVisibility(View.VISIBLE);
+                graphic = true;
+            }else{
+                mapView.setVisibility(View.VISIBLE);
+                graphRecycler.setVisibility(View.INVISIBLE);
+                graphic = false;
+            }
+        });
+
+
+
+
+
 
         fab.setOnClickListener(v -> {
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.System.canWrite(this)) {
-                new AlertDialog.Builder(this)
-                        .setMessage("Разрешить чтение и запись настроек системы? Необходимо для работы точки доступа")
-                        .setPositiveButton("OK", (dialog, which) -> {
-                            Intent intent = new Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS);
-                            intent.setData(Uri.parse("package:" + getPackageName()));
-                            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                 showPermissionDialog();
 
-                            startActivityForResult(intent, REQUEST_WRITE_SETTINGS);
-                        }).show();
+
             } else {
 
 
@@ -186,6 +215,7 @@ public class TimeActivity extends AppCompatActivity implements OnMapReadyCallbac
         setAdapter();
         setDaysOnline();
         setMap(savedInstanceState);
+        setGraphic();
 
 
         initSocket();
@@ -193,8 +223,85 @@ public class TimeActivity extends AppCompatActivity implements OnMapReadyCallbac
         socket.on("deletePointLocationWiFI", deletePoint);
         getAllLocationWifi();
 
+
+
+       /* dbMethods.writeTimeToDB("25-марта-2017", "3600020")
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe();
+        dbMethods.writeTimeToDB("26-марта-2017", "3600020")
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe();
+     */
     }
 
+    private void setGraphic() {
+        graphRecycler = (RecyclerView) findViewById(R.id.graph_recycler);
+        graphicAdapter = new GraphicAdapter(graphicModelList);
+        RecyclerView.LayoutManager mLayoutManager = new LinearLayoutManager(TimeActivity.this, LinearLayoutManager.HORIZONTAL, false);
+        graphRecycler.setLayoutManager(mLayoutManager);
+        graphRecycler.setItemAnimator(new DefaultItemAnimator());
+        graphRecycler.setAdapter(graphicAdapter);
+
+
+        dbMethods.getGraphicList()
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(list -> {
+                            graphicModelList.addAll(list);
+
+
+
+                        }, error -> Log.d("stas", "getGraphicList error = " + error.getMessage())
+                );
+
+
+    }
+
+
+
+
+
+
+
+
+    private void showPermissionDialog(){
+        new AlertDialog.Builder(this)
+                .setMessage("Разрешить чтение и запись настроек системы? Необходимо для работы точки доступа")
+                .setPositiveButton("OK", (dialog, which) -> {
+                    Intent intent = new Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS);
+                    intent.setData(Uri.parse("package:" + getPackageName()));
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+
+                    startActivityForResult(intent, REQUEST_WRITE_SETTINGS);
+                }).show();
+    }
+
+    public void checkPermission() {
+        boolean hasPermission = (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED);
+        if (!hasPermission) {
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, REQUEST_WRITE_SETTINGS);
+
+        }
+
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        switch (requestCode) {
+            case REQUEST_WRITE_SETTINGS: {
+                if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+
+                    Toast.makeText(getApplicationContext(), "Достут получен.", Toast.LENGTH_LONG).show();
+                } else {
+                    Toast.makeText(getApplicationContext(), "Разрешить чтение и запись настроек системы?", Toast.LENGTH_LONG).show();
+                }
+            }
+        }
+
+    }
 
     private boolean getMobileInternet() {
         ConnectivityManager cm = (ConnectivityManager) this.getSystemService(Context.CONNECTIVITY_SERVICE);

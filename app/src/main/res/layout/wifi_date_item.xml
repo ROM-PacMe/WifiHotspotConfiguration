@@ -32,5 +32,11 @@
         android:layout_margin="16dp"
         android:text="3 часа"/>
 
+    <View
+        android:layout_below="@+id/time"
+        android:background="#E0E0E0"
+        android:layout_width="match_parent"
+        android:layout_height="1dp"/>
+
 
 </RelativeLayout>

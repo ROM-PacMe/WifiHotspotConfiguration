@@ -2,21 +2,29 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:fab="http://schemas.android.com/tools"
     android:layout_width="match_parent"
+    android:animateLayoutChanges="true"
     android:layout_height="match_parent">
 
+
+
+    <com.google.android.gms.maps.MapView
+        android:id="@+id/map_view"
+        android:layout_width="match_parent"
+        android:layout_height="220dp" />
     <ImageButton
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:src="@drawable/ic_arrow_back"
         android:background="@null"
         android:id="@+id/backBtn"
-        android:elevation="8dp"
         android:padding="16dp"/>
 
-    <com.google.android.gms.maps.MapView
-        android:id="@+id/map_view"
+    <android.support.v7.widget.RecyclerView
+        fab:listitem="@layout/graphic_item"
+        android:layout_below="@+id/setting_block"
         android:layout_width="match_parent"
-        android:layout_height="220dp" />
+        android:layout_height="40dp"
+        android:id="@+id/graph_recycler" />
 
 
     <View
@@ -53,6 +61,16 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:layout_toRightOf="@+id/fab">
+
+            <ImageButton
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_alignParentRight="true"
+                android:id="@+id/toggle"
+                android:background="@null"
+                android:visibility="gone"
+                android:src="@drawable/ic_map_black_24dp"
+                android:layout_margin="8dp"/>
 
             <RelativeLayout
                 android:layout_width="wrap_content"
@@ -106,10 +124,16 @@
 
     <android.support.v7.widget.RecyclerView
         android:layout_width="match_parent"
-        android:layout_below="@+id/separator"
+        android:layout_below="@+id/graph_recycler"
         android:id="@+id/recycler"
         fab:listitem="@layout/wifi_date_item"
         android:layout_height="match_parent"/>
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:id="@+id/separator2"
+        android:layout_below="@+id/graph_recycler"
+        android:background="#E0E0E0" />
 
 
 
